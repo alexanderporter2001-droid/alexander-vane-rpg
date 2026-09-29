@@ -104,3 +104,4 @@ for (const [name, ok] of checks) {
   if (!ok) failures += 1;
 }
 if (failures) process.exit(1);
+
