@@ -254,7 +254,7 @@ function sanitizeContext(context) {
       loyalty: Number(source.speakerState.loyalty) || 0,
       morale: Number(source.speakerState.morale) || 0,
     } : null,
-    crewStatus: Array.isArray(source.crewStatus) ? source.crewStatus.slice(0, 12).map((member) => ({
+    crewStatus: Array.isArray(source.crewStatus) ? source.crewStatus.slice(0, 15).map((member) => ({
       name: cleanText(member?.name, 60),
       role: cleanText(member?.role, 60),
       hp: Number(member?.hp) || 0,
@@ -284,7 +284,8 @@ function pickModel(speakerId, message, context, history) {
   const economyModel = process.env.OPENAI_WORLD_MODEL || 'gpt-6-luna';
   const deepModel = process.env.OPENAI_CREW_MODEL || 'gpt-6-sol';
 
-  if (!context.crewIdentity) return economyModel;
+  const hasCrewContext = Boolean(context.crewIdentity || context.conversationParticipants?.length);
+  if (!hasCrewContext) return economyModel;
 
   const text = message.toLowerCase();
   const routineShipOrder =
