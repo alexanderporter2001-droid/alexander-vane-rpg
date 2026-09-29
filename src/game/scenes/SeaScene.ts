@@ -858,6 +858,7 @@ export class SeaScene extends Phaser.Scene {
     this.nav.setVisible(false);
     this.crewHud.setVisible(false);
     this.mobile?.setVisible(false);
+    this.events.once('resume', () => { this.hud.setVisible(true); this.nav.setVisible(true); this.mobile?.setVisible(true); });
     this.scene.launch('PauseScene', { source: this.scene.key });
     this.scene.pause();
   }
