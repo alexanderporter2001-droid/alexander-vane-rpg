@@ -91,8 +91,8 @@ export class GullrockScene extends Phaser.Scene {
       interact: 'F',
       pause: Phaser.Input.Keyboard.KeyCodes.ESC,
     }) as Record<string, Phaser.Input.Keyboard.Key>;
-    this.keys.interact.on('down', () => this.interactions.trigger());
-    this.keys.pause.on('down', () => this.pauseGame());
+    this.keys.interact?.on('down', () => this.interactions.trigger());
+    this.keys.pause?.on('down', () => this.pauseGame());
   }
 
   private updatePlayer(): void {
@@ -272,8 +272,8 @@ export class GullrockScene extends Phaser.Scene {
       for (let x = 0; x < this.worldW; x += 120) {
         g.beginPath();
         g.moveTo(x, y);
-        g.quadraticBezierTo(x + 30, y - 9, x + 60, y);
-        g.quadraticBezierTo(x + 90, y + 9, x + 120, y);
+        g.lineTo(x + 60, y);
+        g.lineTo(x + 120, y);
         g.strokePath();
       }
     }
