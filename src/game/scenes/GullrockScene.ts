@@ -23,6 +23,7 @@ export class GullrockScene extends Phaser.Scene {
   private toast!: Toast;
   private hud!: Phaser.GameObjects.Text;
   private crewHud!: CrewStatusHud;
+  private dockJobMarkers: Phaser.GameObjects.Text[] = [];
   private lastValid = new Phaser.Math.Vector2(725, 790);
   private lastSaveAt = 0;
 
@@ -36,6 +37,7 @@ export class GullrockScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, this.worldW, this.worldH);
     this.cameras.main.setBounds(0, 0, this.worldW, this.worldH);
     this.drawPort();
+    this.createDockJobMarkers();
 
     const savedSpawn = this.isWalkable(save.player.position.x, save.player.position.y)
       ? save.player.position
@@ -99,6 +101,7 @@ export class GullrockScene extends Phaser.Scene {
     this.mobile?.setInteract(current?.label ?? null);
     const save = SaveManager.get();
     save.player.position = { x: this.player.x, y: this.player.y };
+    this.updateDockJobMarkers();
     this.updateHud();
 
     if (this.time.now - this.lastSaveAt > 20_000) {
@@ -568,7 +571,8 @@ export class GullrockScene extends Phaser.Scene {
     advanceWorldMinutes(save, 2);
     SaveManager.save();
     this.dialogue.close();
-    this.toast.show('Dock shift started · load cargo stack 1/3 on the quay.', 3600);
+    this.updateDockJobMarkers();
+    this.toast.show('Dock shift started · follow the CARGO 1 marker on the quay.', 3600);
   }
 
   private workCargoPoint(expectedProgress: number): void {
@@ -584,7 +588,8 @@ export class GullrockScene extends Phaser.Scene {
 
     if (next < 3) {
       SaveManager.save();
-      this.toast.show(`Cargo loaded · ${next}/3. Find the next marked stack.`, 3000);
+      this.updateDockJobMarkers();
+      this.toast.show(`Cargo loaded · ${next}/3. Follow the next cargo marker.`, 3000);
       return;
     }
 
@@ -604,6 +609,7 @@ export class GullrockScene extends Phaser.Scene {
     }
 
     SaveManager.save();
+    this.updateDockJobMarkers();
     this.toast.show(`Shift complete · +${pay.toLocaleString()} berries.`, 4200);
   }
 
@@ -984,6 +990,35 @@ export class GullrockScene extends Phaser.Scene {
     SaveManager.save();
     this.scene.launch('PauseScene', { source: this.scene.key });
     this.scene.pause();
+  }
+
+  private createDockJobMarkers(): void {
+    const points = [
+      { x: 585, y: 735, label: 'CARGO 1' },
+      { x: 885, y: 735, label: 'CARGO 2' },
+      { x: 725, y: 825, label: 'CARGO 3' },
+    ];
+
+    this.dockJobMarkers = points.map((point) =>
+      this.add.text(point.x, point.y - 34, point.label, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#fff1b9',
+        backgroundColor: '#382b13dd',
+        padding: { x: 7, y: 4 },
+      }).setOrigin(0.5).setDepth(70).setVisible(false),
+    );
+  }
+
+  private updateDockJobMarkers(): void {
+    const save = SaveManager.get();
+    const active = save.world.flags.gullrockDockJobActive === true;
+    const progress = Number(save.world.flags.gullrockDockJobProgress ?? 0);
+
+    this.dockJobMarkers.forEach((marker, index) => {
+      marker.setVisible(active && index === progress);
+    });
   }
 
   private createHud(): void {
