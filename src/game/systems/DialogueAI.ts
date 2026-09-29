@@ -1,5 +1,6 @@
 import type { CampaignSave } from '../state/types';
 import { resolveDialogueIntent, type DialogueSpeakerId } from './DialogueIntent';
+import { selectConversationParticipants } from './ConversationContext';
 import {
   applyDialogueKnowledge,
   dialogueImpression,
@@ -112,7 +113,7 @@ function relevantJournalEvents(save: CampaignSave, message: string, limit = 4): 
     .map((entry) => entry.text);
 }
 
-function buildContext(speaker: DialogueSpeakerId, save: CampaignSave, message: string) {
+function buildContext(speaker: DialogueSpeakerId, save: CampaignSave, message: string, nearbyCrewIds: string[]) {
   const member = save.crew.find((candidate) => candidate.id === speaker);
   const crewSpeaker = Boolean(member);
 
@@ -149,6 +150,7 @@ function buildContext(speaker: DialogueSpeakerId, save: CampaignSave, message: s
           maxHp: crew.maxHp,
         }))
       : [],
+    conversationParticipants: selectConversationParticipants(save, speaker, message, nearbyCrewIds),
     knownEvents: crewSpeaker ? relevantJournalEvents(save, message, 4) : [],
     knowledgeState: {
       vossRumor: save.world.flags.gullrockVossRumorKnown === true,
@@ -199,6 +201,7 @@ export async function resolveDialogueAI(
   message: string,
   save: CampaignSave,
   history: DialogueTurn[] = [],
+  nearbyCrewIds: string[] = [],
 ): Promise<DialogueAIResult> {
   recordDialogueTurn(save, speaker);
 
@@ -216,7 +219,7 @@ export async function resolveDialogueAI(
         speakerId: speaker,
         message,
         history: history.slice(-6),
-        context: buildContext(speaker, save, message),
+        context: buildContext(speaker, save, message, nearbyCrewIds),
       }),
       signal: controller.signal,
     });
