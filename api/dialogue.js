@@ -204,7 +204,12 @@ export default async function handler(req, res) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return res.status(503).json({ error: 'Dialogue service is not configured.' });
 
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  let body;
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  } catch {
+    return res.status(400).json({ error: 'Invalid JSON body.' });
+  }
   const speakerId = cleanText(body.speakerId, 40);
   const profile = profiles[speakerId];
   if (!profile) return res.status(400).json({ error: 'Unknown dialogue speaker.' });
@@ -247,7 +252,10 @@ export default async function handler(req, res) {
       instructions,
       input,
       store: false,
-      max_output_tokens: 320,
+      reasoning: {
+        effort: model.includes('astra') ? 'low' : model.includes('luna') ? 'none' : 'low',
+      },
+      max_output_tokens: 500,
       text: {
         verbosity: 'low',
         format: {
