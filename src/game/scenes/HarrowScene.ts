@@ -10,6 +10,7 @@ type EnemyRole = 'melee' | 'rifle';
 
 interface EnemyUnit {
   sprite: Phaser.Physics.Arcade.Sprite;
+  downLabel?: Phaser.GameObjects.Text;
   role: EnemyRole;
   hp: number;
   alert: boolean;
@@ -45,6 +46,7 @@ export class HarrowScene extends Phaser.Scene {
   private status!: Phaser.GameObjects.Text;
 
   private order: CaptainOrder = 'regroup';
+  private lastFacing = new Phaser.Math.Vector2(1, 0);
   private attackReadyAt = 0;
   private pullReadyAt = 0;
   private dashReadyAt = 0;
@@ -97,6 +99,7 @@ export class HarrowScene extends Phaser.Scene {
         backgroundColor: '#071116c9',
         padding: { x: 5, y: 3 },
       }).setOrigin(0.5, 1).setDepth(84);
+      if (unit.hp <= 0) this.markCrewDown(unit);
     }
 
     const defs: Array<[number, number, EnemyRole]> = [
@@ -139,7 +142,8 @@ export class HarrowScene extends Phaser.Scene {
         if (!bullet.active || unit.hp <= 0) return;
         bullet.disableBody(true, true);
         unit.hp = Math.max(0, unit.hp - 10);
-        this.hitFlash(unit.sprite);
+        if (unit.hp <= 0) this.markCrewDown(unit);
+        else this.hitFlash(unit.sprite);
       });
     }
 
@@ -166,6 +170,7 @@ export class HarrowScene extends Phaser.Scene {
         order: () => this.cycleOrder(),
         pause: () => this.pauseGame(),
       });
+      this.mobile.setOrderLabel('REGROUP');
     }
 
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
@@ -262,12 +267,17 @@ export class HarrowScene extends Phaser.Scene {
 
   private updateHud(): void {
     const save = SaveManager.get();
-    this.hud.setText([
-      `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp}`,
-      `Stamina ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
-      `Pull familiarity ${Math.round(save.player.fruit.mastery * 100)}%`,
-      `Order: ${this.order.replace('-', ' ')}`,
-    ]);
+    this.hud.setText(this.mobile
+      ? [
+          `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp} · STM ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
+          `Pull familiarity ${Math.round(save.player.fruit.mastery * 100)}%`,
+        ]
+      : [
+          `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp}`,
+          `Stamina ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
+          `Pull familiarity ${Math.round(save.player.fruit.mastery * 100)}%`,
+          `Order: ${this.order.replace('-', ' ')}`,
+        ]);
     const alerted = this.enemies.filter((e) => e.alert && e.hp > 0).length;
     this.status.setText(`Harrow Docks\n${formatWorldTime(save)}${alerted ? `\n${alerted} alerted` : ''}`);
   }
@@ -292,6 +302,7 @@ export class HarrowScene extends Phaser.Scene {
 
     if (this.time.now >= this.dashUntil) {
       const v = this.getMove();
+      if (v.lengthSq() > 0.01) this.lastFacing.copy(v).normalize();
       this.player.setVelocity(v.x * 210, v.y * 210);
     }
 
@@ -454,16 +465,15 @@ export class HarrowScene extends Phaser.Scene {
     if (this.dead || this.time.now < this.attackReadyAt) return;
     this.attackReadyAt = this.time.now + 380;
 
-    let facing = this.getMove();
-    if (facing.lengthSq() < 0.01) facing = new Phaser.Math.Vector2(1, 0);
-    facing.normalize();
+    const facing = this.getAttackFacing();
+    this.lastFacing.copy(facing);
 
     const slash = this.add.arc(
       this.player.x,
       this.player.y,
-      58,
-      Phaser.Math.RadToDeg(facing.angle() - 0.9),
-      Phaser.Math.RadToDeg(facing.angle() + 0.9),
+      62,
+      Phaser.Math.RadToDeg(facing.angle() - 0.95),
+      Phaser.Math.RadToDeg(facing.angle() + 0.95),
       false,
       0xffefbd,
       0,
@@ -473,13 +483,46 @@ export class HarrowScene extends Phaser.Scene {
     for (const enemy of this.enemies) {
       if (enemy.hp <= 0) continue;
       const to = new Phaser.Math.Vector2(enemy.sprite.x - this.player.x, enemy.sprite.y - this.player.y);
-      if (to.length() > 72) continue;
-      if (to.normalize().dot(facing) < 0.05) continue;
+      if (to.length() > (this.mobile ? 86 : 80)) continue;
+      if (to.clone().normalize().dot(facing) < -0.08) continue;
       enemy.alert = true;
       enemy.hp -= 26;
       this.hitFlash(enemy.sprite);
       if (enemy.hp <= 0) this.downEnemy(enemy);
     }
+  }
+
+  private getAttackFacing(): Phaser.Math.Vector2 {
+    const input = this.getMove();
+    const movingFacing = input.lengthSq() > 0.02 ? input.clone().normalize() : null;
+
+    if (this.mobile) {
+      const nearby = this.enemies
+        .filter((enemy) => enemy.hp > 0)
+        .map((enemy) => ({
+          enemy,
+          distance: Phaser.Math.Distance.Between(
+            this.player.x,
+            this.player.y,
+            enemy.sprite.x,
+            enemy.sprite.y,
+          ),
+        }))
+        .filter((entry) => entry.distance <= 100)
+        .sort((a, b) => a.distance - b.distance)[0];
+
+      if (nearby) {
+        const toward = new Phaser.Math.Vector2(
+          nearby.enemy.sprite.x - this.player.x,
+          nearby.enemy.sprite.y - this.player.y,
+        ).normalize();
+
+        if (!movingFacing || toward.dot(movingFacing) >= -0.2) return toward;
+      }
+    }
+
+    if (movingFacing) return movingFacing;
+    return this.lastFacing.clone().normalize();
   }
 
   private pull(): void {
@@ -552,7 +595,8 @@ export class HarrowScene extends Phaser.Scene {
     if (this.dead || this.time.now < this.dashReadyAt || save.player.stamina < 18) return;
 
     let v = this.getMove();
-    if (v.lengthSq() < 0.01) v = new Phaser.Math.Vector2(1, 0);
+    if (v.lengthSq() < 0.01) v = this.lastFacing.clone();
+    else this.lastFacing.copy(v).normalize();
     v.normalize();
 
     save.player.stamina -= 18;
@@ -566,6 +610,8 @@ export class HarrowScene extends Phaser.Scene {
     const orders: CaptainOrder[] = ['regroup', 'aggressive', 'defensive', 'protect-sera', 'retreat'];
     const next = (orders.indexOf(this.order) + 1) % orders.length;
     this.order = orders[next] ?? 'regroup';
+    const label = this.order === 'protect-sera' ? 'PROTECT' : this.order.toUpperCase();
+    this.mobile?.setOrderLabel(label);
     this.toast.show(`Captain order: ${this.order.replace('-', ' ')}`);
   }
 
@@ -624,16 +670,56 @@ export class HarrowScene extends Phaser.Scene {
   private downEnemy(enemy: EnemyUnit): void {
     enemy.hp = 0;
     enemy.sprite.setVelocity(0, 0);
-    enemy.sprite.setTint(0x6f777a).setAlpha(0.62);
+    enemy.sprite
+      .setData('downed', true)
+      .setTint(0x555b5f)
+      .setAlpha(0.72)
+      .setAngle(90)
+      .setScale(0.9, 0.55);
+
     const body = enemy.sprite.body as Phaser.Physics.Arcade.Body;
     body.enable = false;
     enemy.windup?.destroy();
+
+    if (!enemy.downLabel) {
+      enemy.downLabel = this.add.text(enemy.sprite.x, enemy.sprite.y - 18, 'DOWN', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#ffd3ca',
+        backgroundColor: '#341a1acc',
+        padding: { x: 6, y: 3 },
+      }).setOrigin(0.5).setDepth(88);
+    }
+  }
+
+  private markCrewDown(unit: CrewUnit): void {
+    unit.hp = 0;
+    unit.sprite
+      .setVelocity(0, 0)
+      .setData('downed', true)
+      .setTint(0x555b5f)
+      .setAlpha(0.74)
+      .setAngle(90)
+      .setScale(0.9, 0.55);
+
+    const body = unit.sprite.body as Phaser.Physics.Arcade.Body;
+    body.enable = false;
+
+    const name = unit.id === 'sera' ? 'SERA QUILL' : 'ROWAN VALE';
+    unit.label
+      ?.setText(`${name} · DOWN`)
+      .setColor('#ffd3ca')
+      .setBackgroundColor('#341a1acc')
+      .setAlpha(1);
   }
 
   private hitFlash(target: Phaser.GameObjects.Sprite): void {
     target.setTintFill(0xffffff);
     this.time.delayedCall(80, () => {
-      if (target.active) target.clearTint();
+      if (!target.active) return;
+      if (target.getData('downed')) target.setTint(0x555b5f);
+      else target.clearTint();
     });
   }
 
@@ -677,8 +763,8 @@ export class HarrowScene extends Phaser.Scene {
   private syncCrewLabels(): void {
     for (const unit of this.crew) {
       unit.label
-        ?.setPosition(unit.sprite.x, unit.sprite.y - 58)
-        .setAlpha(unit.hp > 0 ? 1 : 0.45);
+        ?.setPosition(unit.sprite.x, unit.sprite.y - 64)
+        .setAlpha(1);
     }
   }
 

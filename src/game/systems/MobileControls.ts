@@ -22,6 +22,7 @@ export class MobileControls {
 
   private root: HTMLDivElement;
   private joystick: HTMLDivElement;
+  private base: HTMLDivElement;
   private nub: HTMLDivElement;
   private attack: HTMLButtonElement;
   private secondary: HTMLButtonElement;
@@ -29,8 +30,14 @@ export class MobileControls {
   private interact: HTMLButtonElement;
   private order?: HTMLButtonElement;
   private pause: HTMLButtonElement;
+
   private pointerId: number | null = null;
+  private stickCenterX = 0;
+  private stickCenterY = 0;
   private visible = true;
+  private combatVisible = true;
+  private interactLabel: string | null = null;
+  private cleanups: Array<() => void> = [];
 
   constructor(scene: Phaser.Scene, actions: MobileActions) {
     this.root = document.createElement('div');
@@ -38,19 +45,19 @@ export class MobileControls {
     this.root.setAttribute('aria-label', 'Game controls');
 
     this.joystick = document.createElement('div');
-    this.joystick.className = 'mobile-joystick';
-    this.joystick.setAttribute('aria-label', 'Movement joystick');
+    this.joystick.className = 'mobile-joystick-zone';
+    this.joystick.setAttribute('aria-label', 'Movement area');
 
-    const base = document.createElement('div');
-    base.className = 'mobile-joystick-base';
+    this.base = document.createElement('div');
+    this.base.className = 'mobile-joystick-base';
 
     this.nub = document.createElement('div');
     this.nub.className = 'mobile-joystick-nub';
 
-    this.joystick.append(base, this.nub);
+    this.joystick.append(this.base, this.nub);
     this.root.append(this.joystick);
 
-    this.attack = this.makeButton('ATTACK', 'attack', actions.primary);
+    this.attack = this.makeButton('ATTACK', 'attack', actions.primary, 390);
     this.secondary = this.makeButton('PULL', 'pull', actions.secondary);
     this.dash = this.makeButton('DASH', 'dash', actions.dash);
     this.interact = this.makeButton('INTERACT', 'interact', actions.interact);
@@ -73,32 +80,38 @@ export class MobileControls {
     this.joystick.addEventListener('pointercancel', this.onStickEnd);
     this.joystick.addEventListener('lostpointercapture', this.onStickEnd);
 
-    this.setInteract(null);
+    this.resetVisualCenter();
+    this.refreshVisibility();
 
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.destroy());
   }
 
   setInteract(label: string | null): void {
-    this.interact.style.display = label && this.visible ? 'flex' : 'none';
+    this.interactLabel = label;
     if (label) this.interact.textContent = label.toUpperCase();
+    this.refreshVisibility();
+  }
+
+  setOrderLabel(label: string): void {
+    if (this.order) this.order.textContent = label.toUpperCase();
   }
 
   setVisible(visible: boolean): void {
     this.visible = visible;
     this.root.style.display = visible ? 'block' : 'none';
     if (!visible) this.resetStick();
+    else this.refreshVisibility();
   }
 
   setCombatVisible(visible: boolean): void {
-    const display = visible ? 'flex' : 'none';
-    this.attack.style.display = display;
-    this.secondary.style.display = display;
-    this.dash.style.display = display;
-    if (this.order) this.order.style.display = display;
+    this.combatVisible = visible;
+    this.refreshVisibility();
   }
 
   destroy(): void {
     this.resetStick();
+    this.cleanups.forEach((cleanup) => cleanup());
+    this.cleanups = [];
     this.joystick.removeEventListener('pointerdown', this.onStickDown);
     this.joystick.removeEventListener('pointermove', this.onStickMove);
     this.joystick.removeEventListener('pointerup', this.onStickEnd);
@@ -107,29 +120,65 @@ export class MobileControls {
     this.root.remove();
   }
 
-  private makeButton(label: string, className: string, action: () => void): HTMLButtonElement {
+  private refreshVisibility(): void {
+    if (!this.visible) return;
+
+    const combatDisplay = this.combatVisible ? 'flex' : 'none';
+    this.attack.style.display = combatDisplay;
+    this.secondary.style.display = combatDisplay;
+    this.dash.style.display = combatDisplay;
+
+    this.interact.style.display = this.interactLabel ? 'flex' : 'none';
+
+    if (this.order) {
+      this.order.style.display = this.combatVisible && !this.interactLabel ? 'flex' : 'none';
+    }
+  }
+
+  private makeButton(
+    label: string,
+    className: string,
+    action: () => void,
+    repeatMs?: number,
+  ): HTMLButtonElement {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `mobile-action mobile-${className}`;
     button.textContent = label;
     button.setAttribute('aria-label', label);
 
+    let repeatId: number | null = null;
+
+    const clearRepeat = () => {
+      if (repeatId !== null) {
+        window.clearInterval(repeatId);
+        repeatId = null;
+      }
+    };
+
     const trigger = (event: PointerEvent) => {
       event.preventDefault();
       event.stopPropagation();
       button.classList.add('is-pressed');
       action();
+
+      if (repeatMs && repeatId === null) {
+        repeatId = window.setInterval(action, repeatMs);
+      }
     };
+
     const release = (event: PointerEvent) => {
       event.preventDefault();
       event.stopPropagation();
       button.classList.remove('is-pressed');
+      clearRepeat();
     };
 
     button.addEventListener('pointerdown', trigger);
     button.addEventListener('pointerup', release);
     button.addEventListener('pointercancel', release);
     button.addEventListener('pointerleave', release);
+    this.cleanups.push(clearRepeat);
     return button;
   }
 
@@ -139,11 +188,26 @@ export class MobileControls {
     if (this.pointerId !== null) return;
 
     this.pointerId = event.pointerId;
+
     try {
       this.joystick.setPointerCapture(event.pointerId);
     } catch {
-      // Pointer capture is helpful but not required for movement.
+      // Movement still works without pointer capture on browsers that reject it.
     }
+
+    const rect = this.joystick.getBoundingClientRect();
+    const margin = 62;
+    const localX = Phaser.Math.Clamp(event.clientX - rect.left, margin, rect.width - margin);
+    const localY = Phaser.Math.Clamp(event.clientY - rect.top, margin, rect.height - margin);
+
+    this.stickCenterX = rect.left + localX;
+    this.stickCenterY = rect.top + localY;
+    this.base.style.left = `${localX}px`;
+    this.base.style.top = `${localY}px`;
+    this.nub.style.left = `${localX}px`;
+    this.nub.style.top = `${localY}px`;
+    this.joystick.classList.add('is-active');
+
     this.updateStick(event);
   };
 
@@ -162,29 +226,37 @@ export class MobileControls {
   };
 
   private updateStick(event: PointerEvent): void {
-    const rect = this.joystick.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    let dx = event.clientX - centerX;
-    let dy = event.clientY - centerY;
+    let dx = event.clientX - this.stickCenterX;
+    let dy = event.clientY - this.stickCenterY;
 
-    const max = 54;
+    const max = 52;
     const length = Math.hypot(dx, dy);
     if (length > max && length > 0) {
       dx = (dx / length) * max;
       dy = (dy / length) * max;
     }
 
-    this.nub.style.transform = `translate(${dx}px, ${dy}px)`;
+    this.nub.style.transform = `translate(-50%, -50%) translate(${dx}px, ${dy}px)`;
     this.move.set(dx / max, dy / max);
 
     if (this.move.length() > 1) this.move.normalize();
-    if (this.move.length() < 0.08) this.move.set(0, 0);
+    if (this.move.length() < 0.1) this.move.set(0, 0);
   }
 
   private resetStick(): void {
     this.pointerId = null;
     this.move.set(0, 0);
-    this.nub.style.transform = 'translate(0px, 0px)';
+    this.nub.style.transform = 'translate(-50%, -50%)';
+    this.joystick.classList.remove('is-active');
+    this.resetVisualCenter();
+  }
+
+  private resetVisualCenter(): void {
+    const x = '46%';
+    const y = '64%';
+    this.base.style.left = x;
+    this.base.style.top = y;
+    this.nub.style.left = x;
+    this.nub.style.top = y;
   }
 }
