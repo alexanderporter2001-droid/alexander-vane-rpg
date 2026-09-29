@@ -13,7 +13,7 @@ const checks = [
   ['v1/v2 money migration exists', save.includes('oldPlayer.money')],
   ['old maxForce migration exists', save.includes('f.maxForce')],
   ['Harrow escape migration exists', save.includes("oldWorld.harrowEscape === 'escaped'")],
-  ['current game version is 0.3.6', source.includes("GAME_VERSION = '0.3.6'")],
+  ['current game version is 0.3.7', source.includes("GAME_VERSION = '0.3.7'")],
   ['ship-disabled state is defined', source.includes('waywardGullDisabled: false')],
   ['Sera sailing delegation defaults on', source.includes('sailingDelegated: true')],
   ['Gullrock is the first delegated destination', source.includes("shipDestination: 'gullrock'")],
