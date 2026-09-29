@@ -238,7 +238,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({
       ok: true,
-      service: 'alexander-vane-dialogue',
+      service: 'alexander-vane-dialogue-v0.3.10',
       configured: Boolean(process.env.OPENAI_API_KEY),
       crewModel: process.env.OPENAI_CREW_MODEL || 'gpt-6-sol',
       worldModel: process.env.OPENAI_WORLD_MODEL || 'gpt-6-luna',
