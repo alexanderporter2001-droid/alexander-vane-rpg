@@ -13,6 +13,10 @@ interface Port {
   x: number;
   y: number;
   radius: number;
+  approachX: number;
+  approachY: number;
+  dockX: number;
+  dockY: number;
 }
 
 type NavigationMode = 'manual' | 'sera';
@@ -21,8 +25,28 @@ export class SeaScene extends Phaser.Scene {
   private readonly worldW = 4200;
   private readonly worldH = 3200;
   private readonly ports: Port[] = [
-    { id: 'harrow', name: 'Harrow Island', x: 760, y: 1760, radius: 260 },
-    { id: 'gullrock', name: 'Gullrock Port', x: 2790, y: 760, radius: 280 },
+    {
+      id: 'harrow',
+      name: 'Harrow Island',
+      x: 760,
+      y: 1760,
+      radius: 320,
+      approachX: 760,
+      approachY: 2160,
+      dockX: 760,
+      dockY: 2020,
+    },
+    {
+      id: 'gullrock',
+      name: 'Gullrock Port',
+      x: 2790,
+      y: 760,
+      radius: 370,
+      approachX: 2790,
+      approachY: 1215,
+      dockX: 2790,
+      dockY: 1065,
+    },
   ];
   private readonly safeWaypoint = new Phaser.Math.Vector2(2300, 1850);
 
@@ -44,6 +68,8 @@ export class SeaScene extends Phaser.Scene {
   private nearestPort: Port | null = null;
   private breachNotified = false;
   private arrivalNotifiedPortId: Port['id'] | null = null;
+  private arrivalReady = false;
+  private docking = false;
 
   private deck?: Phaser.GameObjects.Container;
   private deckPlayer?: Phaser.GameObjects.Image;
@@ -128,6 +154,11 @@ export class SeaScene extends Phaser.Scene {
     }
 
     const talking = this.dialogue.isOpen();
+
+    if (this.docking) {
+      this.updateHud();
+      return;
+    }
 
     if (this.navigationMode === 'sera') {
       if (!this.canSeraNavigate()) {
@@ -220,17 +251,23 @@ export class SeaScene extends Phaser.Scene {
     const turn = Phaser.Math.Angle.Wrap(desired - this.heading);
     this.heading += Phaser.Math.Clamp(turn, -1.1, 1.1) * 1.25 * dt;
 
-    const distanceToPort = Phaser.Math.Distance.Between(
+    const approachDistance = Phaser.Math.Distance.Between(
       this.ship.x,
       this.ship.y,
-      this.navTarget.x,
-      this.navTarget.y,
+      this.navTarget.approachX,
+      this.navTarget.approachY,
     );
 
+    if (approachDistance <= 34) {
+      this.speed = 0;
+      this.enterArrivalApproach();
+      return;
+    }
+
     let targetSpeed = 155;
-    if (distanceToPort < this.navTarget.radius + 360) targetSpeed = 92;
-    if (distanceToPort < this.navTarget.radius + 150) targetSpeed = 48;
-    if (distanceToPort <= this.navTarget.radius * 0.88) targetSpeed = 18;
+    if (approachDistance < 520) targetSpeed = 92;
+    if (approachDistance < 250) targetSpeed = 54;
+    if (approachDistance < 110) targetSpeed = 24;
 
     const accel = targetSpeed > this.speed ? 54 : 82;
     this.speed = Phaser.Math.Linear(this.speed, targetSpeed, Phaser.Math.Clamp((accel * dt) / 160, 0, 1));
@@ -252,7 +289,7 @@ export class SeaScene extends Phaser.Scene {
       return this.safeWaypoint;
     }
 
-    return new Phaser.Math.Vector2(this.navTarget.x, this.navTarget.y);
+    return new Phaser.Math.Vector2(this.navTarget.approachX, this.navTarget.approachY);
   }
 
   private updateDeckMovement(dt: number): void {
@@ -276,7 +313,15 @@ export class SeaScene extends Phaser.Scene {
 
     const vx = Math.cos(this.heading) * this.speed;
     const vy = Math.sin(this.heading) * this.speed;
-    this.ship.setVelocity(vx, vy);
+    const nextX = this.ship.x + vx * 0.16;
+    const nextY = this.ship.y + vy * 0.16;
+
+    if (this.ports.some((port) => this.isInsideIslandLand(nextX, nextY, port))) {
+      this.speed = 0;
+      this.ship.setVelocity(0, 0);
+    } else {
+      this.ship.setVelocity(vx, vy);
+    }
     this.ship.setRotation(this.heading + Math.PI / 2);
 
     if (this.ship.x < 35 || this.ship.x > this.worldW - 35 || this.ship.y < 35 || this.ship.y > this.worldH - 35) {
@@ -317,10 +362,15 @@ export class SeaScene extends Phaser.Scene {
 
   private applyNavigationPresentation(showToast = true): void {
     const delegated = this.navigationMode === 'sera';
-    this.ship.setVisible(!delegated);
-    this.deck?.setVisible(delegated);
+    const deckMode = delegated && !this.arrivalReady;
+    this.ship.setVisible(!deckMode);
+    this.deck?.setVisible(deckMode);
 
-    if (delegated) {
+    if (delegated && this.arrivalReady) {
+      this.cameras.main.startFollow(this.ship, true, 0.07, 0.07);
+      this.cameras.main.setZoom(this.scale.width < 700 ? 1.08 : 1.02);
+      this.mobile?.setOrderLabel('TAKE HELM');
+    } else if (delegated) {
       this.cameras.main.startFollow(this.ship, true, 0.12, 0.12);
       this.cameras.main.setZoom(this.scale.width < 700 ? 1.55 : 1.42);
       this.mobile?.setOrderLabel('TAKE HELM');
@@ -330,6 +380,19 @@ export class SeaScene extends Phaser.Scene {
       this.cameras.main.setZoom(this.scale.width < 700 ? 0.82 : 0.95);
       this.mobile?.setOrderLabel('SERA HELM');
     }
+  }
+
+  private enterArrivalApproach(): void {
+    if (this.arrivalReady) return;
+    this.arrivalReady = true;
+    this.speed = 0;
+    this.ship.setVelocity(0, 0);
+    this.applyNavigationPresentation(false);
+    this.arrivalNotifiedPortId = this.navTarget.id;
+    this.toast.show(
+      `Sera: ${this.navTarget.name} ahead. We're holding offshore—give the word and I'll bring the Gull into the harbor.`,
+      4200,
+    );
   }
 
   private canSeraNavigate(): boolean {
@@ -487,7 +550,12 @@ export class SeaScene extends Phaser.Scene {
 
     let best: { port: Port; d: number } | null = null;
     for (const port of this.ports) {
-      const d = Phaser.Math.Distance.Between(this.ship.x, this.ship.y, port.x, port.y);
+      const d = Phaser.Math.Distance.Between(
+        this.ship.x,
+        this.ship.y,
+        port.approachX,
+        port.approachY,
+      );
       if (!best || d < best.d) best = { port, d };
     }
     this.nearestPort = best?.port ?? null;
@@ -495,29 +563,26 @@ export class SeaScene extends Phaser.Scene {
     const gullrock = this.ports[1];
     if (gullrock) {
       const d = Phaser.Math.Distance.Between(this.ship.x, this.ship.y, gullrock.x, gullrock.y);
-      if (d < 700 && !save.world.flags.gullrockDiscovered) {
+      if (d < 760 && !save.world.flags.gullrockDiscovered) {
         save.world.flags.gullrockDiscovered = true;
         this.toast.show('Sera: Land ahead. Gullrock Port.');
       }
     }
 
-    const canDock = Boolean(best && best.d <= best.port.radius && Math.abs(this.speed) <= 65);
+    if (
+      this.navigationMode === 'sera' &&
+      best?.port.id === this.navTarget.id &&
+      best.d <= 40
+    ) {
+      this.enterArrivalApproach();
+    }
+
+    const canDock = Boolean(best && best.d <= 70 && Math.abs(this.speed) <= 28);
     const talkTarget = this.deckTalkTarget();
     if (talkTarget) {
       this.mobile?.setInteract(`Talk ${talkTarget === 'sera' ? 'Sera' : 'Rowan'}`);
     } else {
       this.mobile?.setInteract(canDock ? `Dock ${best?.port.name ?? ''}` : null);
-    }
-
-    if (
-      this.navigationMode === 'sera' &&
-      best &&
-      best.port.id === this.navTarget.id &&
-      best.d <= best.port.radius &&
-      this.arrivalNotifiedPortId !== best.port.id
-    ) {
-      this.arrivalNotifiedPortId = best.port.id;
-      this.toast.show(`Sera: We're at ${best.port.name}. Give the word and I'll bring us in.`, 3600);
     }
   }
 
@@ -603,31 +668,65 @@ export class SeaScene extends Phaser.Scene {
       this.emergencyPatch();
       return;
     }
-    if (!this.nearestPort) return;
+    if (!this.nearestPort || this.docking) return;
 
     const d = Phaser.Math.Distance.Between(
       this.ship.x,
       this.ship.y,
-      this.nearestPort.x,
-      this.nearestPort.y,
+      this.nearestPort.approachX,
+      this.nearestPort.approachY,
     );
 
-    if (d > this.nearestPort.radius) {
-      this.toast.show('No dock is within boarding distance.');
+    if (d > 70) {
+      this.toast.show('We are not lined up with the harbor approach yet.');
       return;
     }
-    if (Math.abs(this.speed) > 65) {
-      this.toast.show('Too fast to dock. Reduce speed first.');
+    if (Math.abs(this.speed) > 28) {
+      this.toast.show('Too fast to begin docking. Reduce speed first.');
       return;
     }
 
+    this.beginDockingSequence(this.nearestPort);
+  }
+
+  private beginDockingSequence(port: Port): void {
+    this.docking = true;
+    this.arrivalReady = true;
+    this.speed = 0;
+    this.ship.setVelocity(0, 0);
+    this.deck?.setVisible(false);
+    this.ship.setVisible(true);
+    this.mobile?.setVisible(false);
+
+    this.cameras.main.startFollow(this.ship, true, 0.08, 0.08);
+    this.cameras.main.setZoom(this.scale.width < 700 ? 1.16 : 1.08);
+    this.toast.show(`Sera brings the Wayward Gull in toward ${port.name}'s dock.`, 2400);
+
+    const angle = Phaser.Math.Angle.Between(this.ship.x, this.ship.y, port.dockX, port.dockY);
+    this.heading = angle;
+    this.ship.setRotation(angle + Math.PI / 2);
+
+    this.tweens.add({
+      targets: this.ship,
+      x: port.dockX,
+      y: port.dockY,
+      duration: 1600,
+      ease: 'Sine.easeInOut',
+      onComplete: () => {
+        this.cameras.main.fadeOut(360, 5, 12, 18);
+        this.time.delayedCall(390, () => this.completeDock(port));
+      },
+    });
+  }
+
+  private completeDock(port: Port): void {
     const save = SaveManager.get();
-    save.ship.x = this.ship.x;
-    save.ship.y = this.ship.y;
+    save.ship.x = port.dockX;
+    save.ship.y = port.dockY;
     save.ship.heading = this.heading;
     save.ship.speed = 0;
 
-    if (this.nearestPort.id === 'gullrock') {
+    if (port.id === 'gullrock') {
       save.world.scene = 'gullrock';
       save.world.locationId = 'gullrock-port';
       save.world.flags.gullrockDiscovered = true;
@@ -685,8 +784,8 @@ export class SeaScene extends Phaser.Scene {
     const dist = Math.round(Phaser.Math.Distance.Between(
       this.ship.x,
       this.ship.y,
-      this.navTarget.x,
-      this.navTarget.y,
+      this.navTarget.approachX,
+      this.navTarget.approachY,
     ));
     const bearing = this.cardinal(Phaser.Math.Angle.Between(
       this.ship.x,
@@ -727,6 +826,12 @@ export class SeaScene extends Phaser.Scene {
     this.scene.pause();
   }
 
+  private isInsideIslandLand(x: number, y: number, port: Port): boolean {
+    const dx = (x - port.x) / (port.radius * 1.02);
+    const dy = (y - port.y) / (port.radius * 0.68);
+    return dx * dx + dy * dy < 1;
+  }
+
   private isInReef(x: number, y: number): boolean {
     return (
       Phaser.Math.Distance.Between(x, y, 1840, 1320) < 210 ||
@@ -751,6 +856,7 @@ export class SeaScene extends Phaser.Scene {
 
     this.drawIsland(760, 1760, 320, 0x6c6a4b, 'HARROW');
     this.drawIsland(2790, 760, 370, 0x657451, 'GULLROCK');
+    for (const port of this.ports) this.drawHarborApproach(port);
 
     const reef = this.add.graphics().setDepth(-8);
     reef.fillStyle(0x65a7ad, 0.35).fillCircle(1840, 1320, 210);
@@ -762,6 +868,21 @@ export class SeaScene extends Phaser.Scene {
       fontSize: '12px',
       color: '#d7edef',
     }).setOrigin(0.5).setAlpha(0.55).setDepth(-7);
+  }
+
+  private drawHarborApproach(port: Port): void {
+    const g = this.add.graphics().setDepth(-6);
+    g.lineStyle(4, 0x7a5b3d, 0.9);
+    g.lineBetween(port.dockX - 34, port.dockY, port.dockX + 34, port.dockY);
+    g.lineStyle(2, 0xd7edef, 0.28);
+    g.strokeCircle(port.approachX, port.approachY, 28);
+    this.add.text(port.approachX, port.approachY + 40, 'HARBOR APPROACH', {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '10px',
+      color: '#d7edef',
+      backgroundColor: '#07111688',
+      padding: { x: 5, y: 3 },
+    }).setOrigin(0.5).setDepth(-5);
   }
 
   private drawIsland(x: number, y: number, radius: number, color: number, label: string): void {
