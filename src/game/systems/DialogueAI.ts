@@ -107,8 +107,7 @@ export async function resolveDialogueAI(
       signal: controller.signal,
     });
 
-    if (!response.ok) throw new Error(`Dialogue API returned ${response.status}`);
-    const data = await response.json() as {
+    const data = await response.json().catch(() => ({})) as {
       reply?: string;
       memory?: string;
       model?: string;
@@ -116,7 +115,12 @@ export async function resolveDialogueAI(
         type?: 'none' | 'set_course';
         target?: 'none' | 'harrow' | 'gullrock';
       };
+      code?: string;
     };
+
+    if (!response.ok) {
+      throw new Error(data.code || `http_${response.status}`);
+    }
 
     const reply = data.reply?.trim();
     if (!reply) throw new Error('Dialogue API returned no reply');
@@ -136,8 +140,11 @@ export async function resolveDialogueAI(
   } catch (error) {
     console.warn('AI dialogue unavailable; using local intent fallback.', error);
     const local = resolveDialogueIntent(speaker, message, save);
+    const diagnostic = error instanceof Error
+      ? error.message.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48)
+      : 'connection_error';
     return {
-      reply: local.reply,
+      reply: `${local.reply}\n\n[AI unavailable · local fallback · ${diagnostic || 'connection_error'}]`,
       source: 'local',
       action: { type: 'none', target: 'none' },
     };

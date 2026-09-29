@@ -181,6 +181,52 @@ function outputText(payload) {
   return chunks.join('').trim();
 }
 
+async function callDialogueModel(model, apiKey, instructions, input) {
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      instructions,
+      input,
+      store: false,
+      reasoning: { effort: 'none' },
+      max_output_tokens: 1200,
+      text: {
+        verbosity: 'low',
+        format: {
+          type: 'json_schema',
+          name: 'npc_dialogue',
+          strict: true,
+          schema: {
+            type: 'object',
+            properties: {
+              reply: { type: 'string' },
+              remember: { type: 'boolean' },
+              memory: { type: 'string' },
+              action_type: { type: 'string', enum: ['none', 'set_course'] },
+              action_target: { type: 'string', enum: ['none', 'harrow', 'gullrock'] },
+            },
+            required: ['reply', 'remember', 'memory', 'action_type', 'action_target'],
+            additionalProperties: false,
+          },
+        },
+      },
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  return {
+    ok: response.ok,
+    status: response.status,
+    payload,
+    raw: response.ok ? outputText(payload) : '',
+  };
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
 
@@ -190,7 +236,13 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
-    return res.status(200).json({ ok: true, service: 'alexander-vane-dialogue' });
+    return res.status(200).json({
+      ok: true,
+      service: 'alexander-vane-dialogue',
+      configured: Boolean(process.env.OPENAI_API_KEY),
+      crewModel: process.env.OPENAI_CREW_MODEL || 'gpt-6-sol',
+      worldModel: process.env.OPENAI_WORLD_MODEL || 'gpt-6-luna',
+    });
   }
 
   if (req.method !== 'POST') {
@@ -241,58 +293,45 @@ export default async function handler(req, res) {
     alexanderSays: message,
   });
 
-  const openaiResponse = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      instructions,
-      input,
-      store: false,
-      reasoning: {
-        effort: model.includes('astra') ? 'low' : model.includes('luna') ? 'none' : 'low',
-      },
-      max_output_tokens: 500,
-      text: {
-        verbosity: 'low',
-        format: {
-          type: 'json_schema',
-          name: 'npc_dialogue',
-          strict: true,
-          schema: {
-            type: 'object',
-            properties: {
-              reply: { type: 'string' },
-              remember: { type: 'boolean' },
-              memory: { type: 'string' },
-              action_type: { type: 'string', enum: ['none', 'set_course'] },
-              action_target: { type: 'string', enum: ['none', 'harrow', 'gullrock'] },
-            },
-            required: ['reply', 'remember', 'memory', 'action_type', 'action_target'],
-            additionalProperties: false,
-          },
-        },
-      },
-    }),
-  });
+  let usedModel = model;
+  let attempt = await callDialogueModel(usedModel, apiKey, instructions, input);
 
-  const payload = await openaiResponse.json().catch(() => ({}));
-  if (!openaiResponse.ok) {
-    console.error('OpenAI dialogue error', openaiResponse.status, payload?.error?.message || 'unknown');
-    return res.status(502).json({ error: 'The dialogue model did not answer.' });
+  const fallbackModel = process.env.OPENAI_FALLBACK_MODEL || 'gpt-6-luna';
+  if ((!attempt.ok || !attempt.raw) && usedModel !== fallbackModel) {
+    console.warn(
+      'Primary dialogue model failed; retrying fallback.',
+      usedModel,
+      attempt.status,
+      attempt.payload?.error?.message || (attempt.raw ? 'parse pending' : 'empty output'),
+    );
+    usedModel = fallbackModel;
+    attempt = await callDialogueModel(usedModel, apiKey, instructions, input);
   }
 
-  const raw = outputText(payload);
-  if (!raw) return res.status(502).json({ error: 'The dialogue model returned no text.' });
+  if (!attempt.ok) {
+    console.error('OpenAI dialogue error', usedModel, attempt.status, attempt.payload?.error?.message || 'unknown');
+    return res.status(502).json({
+      error: 'The dialogue model did not answer.',
+      code: `openai_${attempt.status || 'error'}`,
+    });
+  }
+
+  if (!attempt.raw) {
+    console.error('OpenAI dialogue returned no text', usedModel, attempt.payload?.status || 'unknown');
+    return res.status(502).json({
+      error: 'The dialogue model returned no text.',
+      code: 'empty_output',
+    });
+  }
 
   let parsed;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(attempt.raw);
   } catch {
-    return res.status(502).json({ error: 'The dialogue model returned an invalid response.' });
+    return res.status(502).json({
+      error: 'The dialogue model returned an invalid response.',
+      code: 'invalid_output',
+    });
   }
 
   const reply = cleanText(parsed.reply, 1400);
@@ -309,6 +348,6 @@ export default async function handler(req, res) {
     action: canSetCourse && target !== 'none'
       ? { type: 'set_course', target }
       : { type: 'none', target: 'none' },
-    model,
+    model: usedModel,
   });
 }
