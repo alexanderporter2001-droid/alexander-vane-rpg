@@ -460,6 +460,13 @@ export class GullrockScene extends Phaser.Scene {
     const save = SaveManager.get();
     const choices: DialogueChoice[] = GULLROCK_GEAR_STOCK.map((itemId) => {
       const item = EQUIPMENT[itemId];
+      if (!item) {
+        return {
+          label: 'Unknown stock item',
+          disabled: true,
+          run: () => undefined,
+        };
+      }
       const stock = this.traderStock(itemId);
       const canAfford = save.player.berries >= item.price;
       return {
