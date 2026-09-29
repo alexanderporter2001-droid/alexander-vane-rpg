@@ -79,6 +79,11 @@ export class MobileControls {
     if (label) this.interactText.setText(label.toUpperCase());
   }
 
+  setVisible(visible: boolean): void {
+    this.root.setVisible(visible);
+    if (!visible) this.resetStick();
+  }
+
   setCombatVisible(visible: boolean): void {
     this.attack.setVisible(visible);
     this.secondary.setVisible(visible);
