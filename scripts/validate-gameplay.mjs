@@ -54,6 +54,7 @@ const checks = [
   ['Gullrock has environmental market detail', gullrock.includes('Market stalls') && gullrock.includes('Named locals are full conversation targets')],
   ['land cameras use a deadzone', harrow.includes('setDeadzone') && gullrock.includes('setDeadzone')],
   ['crew health panel remains compact', style.includes('crew-status')],
+  ['living world system exists', harrow.includes('recordFruitUse')],
   ['Gullrock service NPCs have names', gullrock.includes('Dren Pike — Harbor Master') && gullrock.includes('Marta Vell — Tavern Keeper') && gullrock.includes('Toma Reed — Provisioner') && gullrock.includes('Brann Cale — Shipwright')],
   ['background Gullrock locals have names', gullrock.includes('Elias — Sailor') && gullrock.includes('Nico — Dockhand') && gullrock.includes('Maris — Coastal Trader') && gullrock.includes('Perrin — Porter')],
   ['ports have offshore approach points', sea.includes('approachX') && sea.includes('approachY') && sea.includes('dockX') && sea.includes('dockY')],
