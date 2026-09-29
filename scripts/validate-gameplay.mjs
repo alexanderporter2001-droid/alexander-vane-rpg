@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 
 const mobile = fs.readFileSync(new URL('../src/game/systems/MobileControls.ts', import.meta.url), 'utf8');
+const dialogue = fs.readFileSync(new URL('../src/game/systems/DialoguePanel.ts', import.meta.url), 'utf8');
+const style = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
 const harrow = fs.readFileSync(new URL('../src/game/scenes/HarrowScene.ts', import.meta.url), 'utf8');
 const gullrock = fs.readFileSync(new URL('../src/game/scenes/GullrockScene.ts', import.meta.url), 'utf8');
 const sea = fs.readFileSync(new URL('../src/game/scenes/SeaScene.ts', import.meta.url), 'utf8');
@@ -8,11 +10,16 @@ const sea = fs.readFileSync(new URL('../src/game/scenes/SeaScene.ts', import.met
 const checks = [
   ['touch detection uses maxTouchPoints', mobile.includes('navigator.maxTouchPoints > 0')],
   ['touch detection supports coarse pointers', mobile.includes("(pointer: coarse)")],
-  ['joystick has expanded touch zone', mobile.includes('190, 190')],
-  ['action buttons have expanded hit zones', mobile.includes('diameter + 30')],
-  ['Harrow uses reliable mobile detection', harrow.includes('shouldUseMobileControls()')],
-  ['Sea uses reliable mobile detection', sea.includes('shouldUseMobileControls()')],
-  ['Gullrock uses reliable mobile detection', gullrock.includes('shouldUseMobileControls()')],
+  ['mobile controls are native DOM', mobile.includes("document.createElement('div')") && mobile.includes("document.createElement('button')")],
+  ['joystick uses native pointer capture', mobile.includes('setPointerCapture')],
+  ['native controls sit above canvas', style.includes('.mobile-controls') && style.includes('z-index:1000')],
+  ['native controls accept pointer input', style.includes('pointer-events:auto') && style.includes('touch-action:none')],
+  ['dialogue uses native DOM overlay', dialogue.includes("document.createElement('section')") && dialogue.includes('dialogue-overlay')],
+  ['dialogue body can scroll', style.includes('.dialogue-body') && style.includes('overflow-y:auto')],
+  ['dialogue respects safe areas', style.includes('env(safe-area-inset-bottom)')],
+  ['Harrow uses mobile controls', harrow.includes('new MobileControls')],
+  ['Sea uses mobile controls', sea.includes('new MobileControls')],
+  ['Gullrock uses mobile controls', gullrock.includes('new MobileControls')],
   ['first Marine starts on land', harrow.includes("[470, 610, 'melee']")],
   ['AI movement checks character-safe walkability', harrow.includes('isCharacterWalkable(nextX, nextY)')],
   ['Sera is labeled in Harrow', harrow.includes('SERA QUILL · Navigator')],
