@@ -69,7 +69,11 @@ export class GullrockScene extends Phaser.Scene {
       this.mobile.setCombatVisible(false);
     }
 
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    this.cameras.main.setDeadzone(
+      Math.min(280, this.scale.width * 0.38),
+      Math.min(220, this.scale.height * 0.28),
+    );
     this.cameras.main.setZoom(this.scale.width < 700 ? 1.04 : 1);
     this.toast.show('The Wayward Gull ties off at Gullrock. No one here knows you yet.', 3000);
     SaveManager.save();
@@ -250,7 +254,7 @@ export class GullrockScene extends Phaser.Scene {
       x: 1120,
       y: 540,
       radius: 92,
-      label: 'Shipwright',
+      label: 'Brann Cale — Shipwright',
       run: () => this.shipwright(),
     });
     this.interactions.register({
@@ -349,7 +353,7 @@ export class GullrockScene extends Phaser.Scene {
     if (!berthPaid) {
       const canPay = save.player.berries >= 200;
       this.openDialogue(
-        'Harbor Master',
+        'Dren Pike — Harbor Master',
         'The berth is yours for the day if you pay the fee. I do not care where you came from, only whether your crew causes trouble on my pier.',
         [
           {
@@ -365,7 +369,7 @@ export class GullrockScene extends Phaser.Scene {
     }
 
     this.openDialogue(
-      'Harbor Master',
+      'Dren Pike — Harbor Master',
       'Your berth is paid through tomorrow. If the Gull needs work, the shipwright is east of the market. If you want gossip, buy a drink instead of asking me.',
       [
         { label: 'Ask about Gullrock', run: () => this.harborInfo() },
@@ -395,7 +399,7 @@ export class GullrockScene extends Phaser.Scene {
 
     SaveManager.save();
     this.openDialogue(
-      'Harbor Master',
+      'Dren Pike — Harbor Master',
       'Paid. Sera signs the berth register while the harbor master stamps the page without asking for names beyond the ship manifest.',
       [{ label: 'Done', run: () => undefined }],
     );
@@ -403,7 +407,7 @@ export class GullrockScene extends Phaser.Scene {
 
   private harborInfo(): void {
     this.openDialogue(
-      'Harbor Master',
+      'Dren Pike — Harbor Master',
       'Gullrock lives on repair work, coastal trade, and people who do not ask too many questions. Marines inspect the outer quay irregularly, usually around midday.',
       [{ label: 'Back', run: () => this.harborMaster() }],
     );
@@ -415,7 +419,7 @@ export class GullrockScene extends Phaser.Scene {
     const canBuy = save.player.berries >= 900 && !tooFull;
 
     this.openDialogue(
-      'Provisioner',
+      'Toma Reed — Provisioner',
       'Salted food, clean water, lamp oil, spare cloth, and a little medicine. I sell voyage packs to crews who want to leave quickly.',
       [
         {
@@ -445,7 +449,7 @@ export class GullrockScene extends Phaser.Scene {
     SaveManager.save();
 
     this.openDialogue(
-      'Provisioner',
+      'Toma Reed — Provisioner',
       'Two dockhands carry the food and water down to the Wayward Gull. Sera checks every bundle before it goes aboard.',
       [{ label: 'Done', run: () => undefined }],
     );
@@ -465,7 +469,7 @@ export class GullrockScene extends Phaser.Scene {
     }
 
     this.openDialogue(
-      'Provisioner',
+      'Toma Reed — Provisioner',
       'Eastbound captains have been reefing their sails before sunset. The wind turns hard from the north and small ships drift south if they get greedy with speed.',
       [{ label: 'Back', run: () => this.provisioner() }],
     );
@@ -477,7 +481,7 @@ export class GullrockScene extends Phaser.Scene {
 
     if (missing <= 0) {
       this.openDialogue(
-        'Shipwright',
+        'Brann Cale — Shipwright',
         'I walked the Gull from bow to stern. She is sound enough for open water. Come back when the sea gives me something to fix.',
         [{ label: 'Leave', run: () => undefined }],
       );
@@ -489,7 +493,7 @@ export class GullrockScene extends Phaser.Scene {
     const canAfford = save.player.berries >= cost;
 
     this.openDialogue(
-      'Shipwright',
+      'Brann Cale — Shipwright',
       save.world.flags.waywardGullDisabled
         ? `That emergency patch got you here, but I would not trust it through another reef. Full repair is ${cost.toLocaleString()} berries and about ${repairMinutes} minutes.`
         : `The Gull is down ${missing} points of hull integrity. I can restore her fully for ${cost.toLocaleString()} berries. Figure ${repairMinutes} minutes if my crew starts now.`,
@@ -531,7 +535,7 @@ export class GullrockScene extends Phaser.Scene {
 
     SaveManager.save();
     this.openDialogue(
-      'Shipwright',
+      'Brann Cale — Shipwright',
       'Fresh planks, new fasteners, seams checked twice. The Gull is seaworthy again.',
       [{ label: 'Done', run: () => undefined }],
     );
@@ -542,7 +546,7 @@ export class GullrockScene extends Phaser.Scene {
     const canEat = save.player.berries >= 150;
 
     this.openDialogue(
-      'Tavern Keeper',
+      'Marta Vell — Tavern Keeper',
       'Three strangers and a quiet navigator do not draw much attention here. Pay for a meal, ask a question, or keep moving.',
       [
         {
@@ -570,7 +574,7 @@ export class GullrockScene extends Phaser.Scene {
     SaveManager.save();
 
     this.openDialogue(
-      'Tavern Keeper',
+      'Marta Vell — Tavern Keeper',
       'Hot food, clean plates, no speeches. Rowan eats like he has not seen a table in a week. Sera spends most of the meal listening to nearby sailors.',
       [{ label: 'Done', run: () => undefined }],
     );
@@ -590,7 +594,7 @@ export class GullrockScene extends Phaser.Scene {
     }
 
     this.openDialogue(
-      'Tavern Keeper',
+      'Marta Vell — Tavern Keeper',
       'A bounty-hunter crew came through asking about Derrick “Iron Nail” Voss. They had his face sketched on cheap paper. Nobody showed me yours.',
       [{ label: 'Back', run: () => this.tavernKeeper() }],
     );
@@ -610,7 +614,7 @@ export class GullrockScene extends Phaser.Scene {
     }
 
     this.openDialogue(
-      'Tavern Keeper',
+      'Marta Vell — Tavern Keeper',
       'No permanent checkpoint. A patrol boat noses around the outer quay when it feels like it—often near midday. They care more about cargo papers than faces unless they came looking for someone.',
       [{ label: 'Back', run: () => this.tavernKeeper() }],
     );
@@ -848,16 +852,16 @@ export class GullrockScene extends Phaser.Scene {
       }).setOrigin(0.5, 1).setDepth(26);
     };
 
-    npc(405, 500, 'npc-tavern', 'Tavern Keeper', '#f2d8bd');
-    npc(575, 560, 'npc-harbor', 'Harbor Master', '#d9e8ed');
-    npc(955, 500, 'npc-provisioner', 'Provisioner', '#dce6c8');
-    npc(1120, 540, 'npc-shipwright', 'Shipwright', '#e2d4c8');
+    npc(405, 500, 'npc-tavern', 'Marta Vell — Tavern Keeper', '#f2d8bd');
+    npc(575, 560, 'npc-harbor', 'Dren Pike — Harbor Master', '#d9e8ed');
+    npc(955, 500, 'npc-provisioner', 'Toma Reed — Provisioner', '#dce6c8');
+    npc(1120, 540, 'npc-shipwright', 'Brann Cale — Shipwright', '#e2d4c8');
 
     // Non-interactive locals so the port does not feel like four quest markers in an empty square.
-    npc(660, 385, 'npc-sailor', 'Sailor', '#c9d8dc');
-    npc(770, 600, 'npc-dockhand', 'Dockhand', '#c9d8dc');
-    npc(1085, 355, 'npc-sailor', 'Coastal Trader', '#c9d8dc');
-    npc(520, 365, 'npc-dockhand', 'Porter', '#c9d8dc');
+    npc(660, 385, 'npc-sailor', 'Elias — Sailor', '#c9d8dc');
+    npc(770, 600, 'npc-dockhand', 'Nico — Dockhand', '#c9d8dc');
+    npc(1085, 355, 'npc-sailor', 'Maris — Coastal Trader', '#c9d8dc');
+    npc(520, 365, 'npc-dockhand', 'Perrin — Porter', '#c9d8dc');
 
     g.fillStyle(0x503520, 1).fillRoundedRect(755, 340, 60, 70, 5);
     g.fillStyle(0xe1d4b3, 1).fillRect(765, 350, 40, 20);
