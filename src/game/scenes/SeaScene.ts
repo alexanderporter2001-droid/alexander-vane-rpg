@@ -1403,7 +1403,7 @@ export class SeaScene extends Phaser.Scene {
         run: () => {
           const current = SaveManager.get();
           if ((current.inventory['Rations'] ?? 0) <= 0) return;
-          current.inventory['Rations'] -= 1;
+          current.inventory['Rations'] = Math.max(0, (current.inventory['Rations'] ?? 0) - 1);
           this.performTimedShipActivity(30, 6, 'You eat and take a short rest in the galley.');
         },
       });
