@@ -4,7 +4,7 @@ A private, persistent, consequence-driven pirate RPG built around Alexander Vane
 
 This repository replaces the Floot prototype as the permanent source of truth. Hosting is replaceable; campaign continuity and versioned saves are not.
 
-## Current foundation — v0.3.3
+## Current foundation — v0.3.4
 
 The current vertical slice is built as a complete local loop rather than disconnected demos:
 
@@ -21,7 +21,8 @@ The current vertical slice is built as a complete local loop rather than disconn
 11. Pause-only journal/objectives, campaign overview, save/export/import.
 12. Global permadeath routing so an ended campaign cannot silently resume.
 13. Gullrock has persistent dialogue choices, paid services, ship repair, crew meals, local information, and world-time consequences.
-14. Mobile controls use reliable touch detection and expanded hit areas; Harrow AI respects shoreline boundaries; Sera and Rowan are labeled in-world.
+14. Mobile controls are native browser controls layered above the game canvas, with iPhone safe-area support and independent pointer handling. Harrow AI respects shoreline boundaries; Sera and Rowan are labeled in-world.
+15. Dialogue is a native responsive overlay with scrollable text and choices so small phone screens cannot hide conversation content behind the HUD.
 
 The old fake freeform-intent control is intentionally absent. It returns only when typed intent can resolve into real dialogue, orders, or world actions.
 
