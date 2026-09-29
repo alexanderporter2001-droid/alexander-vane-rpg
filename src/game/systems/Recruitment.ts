@@ -16,6 +16,7 @@ export function recruit(save: CampaignSave, id: string): CrewState | null {
   const check = canRecruit(save, id);
   if (!check.ok) return null;
   const candidate = save.world.recruitCandidates[id];
+  if (!candidate) return null;
   const member: CrewState = {
     id: candidate.id, name: candidate.name, role: candidate.role,
     hp: 90, maxHp: 90, position: { ...save.player.position },
