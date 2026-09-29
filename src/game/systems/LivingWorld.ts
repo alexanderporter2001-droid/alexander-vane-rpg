@@ -1,63 +1,23 @@
-import type { CampaignSave, EncounterDisposition, EncounterRank, WorldEncounterState, WorldIslandState } from '../state/types';
+import type { CampaignSave, CrewState, EncounterRank, RecruitCandidateState, WorldEncounterState, WorldIslandState } from '../state/types';
 
-function hash(text: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i += 1) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
-  return h >>> 0;
+function hash(text: string): number { let h=2166136261; for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);} return h>>>0; }
+function roll(seed:number,salt:number):number { let x=(seed+Math.imul(salt+1,0x9e3779b1))>>>0; x^=x<<13;x^=x>>>17;x^=x<<5;return(x>>>0)/4294967296; }
+const first=['Mira','Tarin','Kael','Nessa','Ivo','Lena','Bram','Celia','Rook','Tessa','Daro','Vela'];
+const last=['Vale','Quill','Marr','Rusk','Venn','Cale','Dane','Pike','Reed','Morrow','Hale','Sorn'];
+const islandA=['Brine','Gull','Cinder','Morrow','Storm','Glass','Drift','Red','Wind','Crown','Hollow','Sun'];
+const islandB=['reach','rock','haven','fall','key','rest','watch','shoal','bay','mere','point','cay'];
+
+export function ensureGeneratedIsland(save:CampaignSave,id:string):WorldIslandState {
+ const existing=save.world.islands[id]; if(existing)return existing; const seed=hash(id), s=roll(seed,1);
+ const island:WorldIslandState={id,seed,name:islandA[Math.floor(roll(seed,2)*islandA.length)]+islandB[Math.floor(roll(seed,3)*islandB.length)],size:s<.38?'small':s<.82?'medium':'large',discovered:false,population:Math.floor(120+roll(seed,4)*2400),marinePresence:roll(seed,5),piratePresence:roll(seed,6),prosperity:.2+roll(seed,7)*.7,danger:.12+roll(seed,8)*.78,factions:[],activeSituations:[],resolvedSituations:[],lastSimulatedDay:save.world.day};
+ if(island.marinePresence>.55)island.factions.push(island.name+' Marine detachment'); if(island.piratePresence>.48)island.factions.push('Independent pirate crews'); island.factions.push(island.name+' locals');
+ const situations=['missing-cargo','local-feud','pirate-shore-leave','marine-inspection','wreck-rumor','merchant-dispute','road-bandits','strange-tide']; island.activeSituations.push(situations[Math.floor(roll(seed,9)*situations.length)]);
+ save.world.islands[id]=island; seedRecruitCandidate(save,island); return island;
 }
-function unit(seed: number, salt: number): number {
-  let x = (seed + Math.imul(salt, 0x9e3779b1)) >>> 0;
-  x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
-  return (x >>> 0) / 4294967295;
-}
-export function ensureIsland(save: CampaignSave, id: string, name: string): WorldIslandState {
-  const existing = save.world.islands[id];
-  if (existing) return existing;
-  const seed = hash(id);
-  const sizeRoll = unit(seed, 1);
-  const island: WorldIslandState = {
-    id, name, seed,
-    size: sizeRoll < 0.35 ? 'small' : sizeRoll < 0.78 ? 'medium' : 'large',
-    discovered: true,
-    population: Math.round(120 + unit(seed, 2) * 4200),
-    marinePresence: unit(seed, 3),
-    piratePresence: unit(seed, 4),
-    prosperity: unit(seed, 5),
-    danger: unit(seed, 6),
-    factions: [],
-    activeSituations: [],
-    resolvedSituations: [],
-    lastSimulatedDay: save.world.day,
-  };
-  save.world.islands[id] = island;
-  return island;
-}
-export function simulateIslandToDay(island: WorldIslandState, day: number): void {
-  while (island.lastSimulatedDay < day) {
-    island.lastSimulatedDay += 1;
-    const drift = unit(island.seed, island.lastSimulatedDay) - 0.5;
-    island.prosperity = Math.max(0, Math.min(1, island.prosperity + drift * 0.025));
-    island.danger = Math.max(0, Math.min(1, island.danger - drift * 0.02));
-  }
-}
-export function encounterRank(seed: number, heat: number): EncounterRank {
-  const roll = unit(seed, 19) - Math.min(0.18, heat * 0.01);
-  if (roll > 0.985) return 'elite';
-  if (roll > 0.92) return 'officer';
-  if (roll > 0.72) return 'veteran';
-  return 'rookie';
-}
-export function createEncounter(save: CampaignSave, locationId: string, atSea: boolean, salt: string): WorldEncounterState {
-  const island = save.world.islands[locationId];
-  const seed = hash(`${locationId}:${save.world.day}:${salt}`);
-  const marineBias = island?.marinePresence ?? 0.35;
-  const pirateBias = island?.piratePresence ?? 0.35;
-  const kindRoll = unit(seed, 8);
-  const kind: WorldEncounterState['kind'] = kindRoll < marineBias * 0.45 ? 'marine' : kindRoll < marineBias * 0.45 + pirateBias * 0.5 ? 'pirate' : kindRoll < 0.82 ? 'merchant' : 'bounty-hunter';
-  const disposition: EncounterDisposition = kind === 'merchant' ? 'neutral' : unit(seed, 10) < 0.35 ? 'hostile' : unit(seed, 11) < 0.5 ? 'wary' : 'neutral';
-  const encounter: WorldEncounterState = { id: `enc-${seed}`, kind, rank: encounterRank(seed, save.world.threatHeat), disposition, locationId, atSea, persistentGroupId: null, createdDay: save.world.day, resolved: false };
-  save.world.encounters.push(encounter);
-  return encounter;
-}
-// Admirals and equivalent canon figures are deliberately excluded from random generation.
-// They enter the simulation only through authored/canon presence or a sufficiently important world response.
+export function simulateWorld(save:CampaignSave):void { for(const island of Object.values(save.world.islands)){const elapsed=Math.max(0,save.world.day-island.lastSimulatedDay);if(!elapsed)continue;const r=roll(island.seed,save.world.day+elapsed);island.prosperity=Math.max(.05,Math.min(.95,island.prosperity+(r-.5)*.025*elapsed));island.danger=Math.max(.04,Math.min(.98,island.danger+(.5-r)*.02*elapsed));island.lastSimulatedDay=save.world.day;} save.world.threatHeat=Math.max(0,save.world.threatHeat-.006); }
+export function rankForEncounter(save:CampaignSave,seed:number):EncounterRank { const r=roll(seed,save.world.day+Math.floor(save.world.threatHeat*100)),heat=Math.min(.18,save.world.threatHeat*.08); if(r<.00015+heat*.002)return'admiral';if(r<.008+heat*.08)return'elite';if(r<.055+heat*.2)return'officer';if(r<.24)return'veteran';return'rookie'; }
+export function createEncounter(save:CampaignSave,locationId:string,atSea:boolean,salt=0):WorldEncounterState { const island=save.world.islands[locationId],seed=hash(locationId+':'+save.world.day+':'+salt+':'+save.world.encounters.length),mw=island?.marinePresence??.35,pw=island?.piratePresence??.4,r=roll(seed,1); const kind=r<mw*.42?'marine':r<mw*.42+pw*.5?'pirate':r<.82?'merchant':r<.92?'bounty-hunter':'traveler'; const d=roll(seed,2),disposition=kind==='merchant'||kind==='traveler'?(d<.1?'wary':'neutral'):d<.28?'hostile':d<.58?'wary':'neutral'; const e:WorldEncounterState={id:'enc-'+seed.toString(36),kind,rank:rankForEncounter(save,seed),disposition,locationId,atSea,persistentGroupId:null,createdDay:save.world.day,resolved:false};save.world.encounters.push(e);return e; }
+export function seedRecruitCandidate(save:CampaignSave,island:WorldIslandState):RecruitCandidateState|null { if(Object.values(save.world.recruitCandidates).some(c=>c.locationId===island.id))return null;const seed=island.seed;if(roll(seed,20)>.58)return null;const roles=['Doctor','Cook','Lookout','Shipwright','Marksman','Musician','Deck fighter'],name=first[Math.floor(roll(seed,21)*first.length)]+' '+last[Math.floor(roll(seed,22)*last.length)],role=roles[Math.floor(roll(seed,23)*roles.length)];const c:RecruitCandidateState={id:'recruit-'+seed.toString(36),name,role,locationId:island.id,available:true,trust:0,requiredTrust:.45+roll(seed,24)*.35,reasonToJoin:'Has a personal reason to leave this island, but will not join a stranger without cause.',equipmentTags:['light-armor','tools'],capabilities:[role.toLowerCase().replace(' ','-')]};save.world.recruitCandidates[c.id]=c;return c; }
+export function recruit(save:CampaignSave,id:string):CrewState|null { if(save.crew.length>=15)return null;const c=save.world.recruitCandidates[id];if(!c||!c.available||c.trust<c.requiredTrust)return null;const m:CrewState={id:c.id,name:c.name,role:c.role,hp:88,maxHp:88,position:{x:0,y:0},loyalty:.5,morale:.62,notes:[c.reasonToJoin],equipmentTags:c.equipmentTags,capabilities:c.capabilities,equipment:{weapon:null,armor:null,tool:null,accessory:null},progression:{experience:0,specialty:.12,techniques:[]},recruitedDay:save.world.day};save.crew.push(m);c.available=false;return m; }
+export function fruitStats(save:CampaignSave):{range:number;force:number;staminaCost:number}{const m=Math.max(0,Math.min(1,save.player.fruit.mastery));return{range:save.player.fruit.range*(1+m*.45),force:save.player.fruit.force*(1+m*.6),staminaCost:Math.max(7,12-Math.floor(m*5))};}
+export function awardCombatProgress(save:CampaignSave,amount:number):void {save.player.progression.combatExperience+=amount;save.player.progression.physicalConditioning=Math.min(1,save.player.progression.physicalConditioning+amount*.00008);}
