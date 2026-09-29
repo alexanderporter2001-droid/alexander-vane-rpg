@@ -105,4 +105,5 @@ for (const [name, ok] of checks) {
   if (!ok) failures += 1;
 }
 if (failures) process.exit(1);
+// v0.3.14 validation marker
 
