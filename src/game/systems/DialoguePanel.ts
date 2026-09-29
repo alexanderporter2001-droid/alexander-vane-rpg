@@ -6,9 +6,17 @@ export interface DialogueChoice {
   disabled?: boolean;
 }
 
+export interface DialogueTranscriptTurn {
+  role: 'player' | 'npc';
+  text: string;
+}
+
 export interface DialogueFreeform {
   placeholder?: string;
-  onSubmit: (text: string) => string | null;
+  onSubmit: (
+    text: string,
+    history: DialogueTranscriptTurn[],
+  ) => string | null | Promise<string | null>;
 }
 
 export interface DialogueOptions {
@@ -35,6 +43,8 @@ export class DialoguePanel {
     this.close(false);
 
     const choices = options.choices ?? [{ label: 'Close', run: () => undefined }];
+    const history: DialogueTranscriptTurn[] = [{ role: 'npc', text: options.text }];
+    let submitting = false;
 
     const overlay = document.createElement('div');
     overlay.className = 'dialogue-overlay';
@@ -71,6 +81,7 @@ export class DialoguePanel {
         button.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (submitting) return;
           this.close();
           choice.run();
         });
@@ -88,7 +99,7 @@ export class DialoguePanel {
       const input = document.createElement('textarea');
       input.className = 'dialogue-input';
       input.rows = 2;
-      input.maxLength = 320;
+      input.maxLength = 600;
       input.placeholder = options.freeform.placeholder ?? 'Say what you want...';
       input.autocomplete = 'off';
       input.spellcheck = true;
@@ -99,37 +110,68 @@ export class DialoguePanel {
       send.className = 'dialogue-send';
       send.textContent = 'SAY';
 
-      const submit = () => {
+      const setBusy = (busy: boolean) => {
+        submitting = busy;
+        input.disabled = busy;
+        send.disabled = busy;
+        send.textContent = busy ? '...' : 'SAY';
+        form.classList.toggle('is-waiting', busy);
+      };
+
+      const submit = async () => {
         const text = input.value.trim();
-        if (!text) return;
+        if (!text || submitting) return;
 
         const userLine = document.createElement('p');
         userLine.className = 'dialogue-line dialogue-line-player';
         userLine.textContent = `YOU: ${text}`;
         body.append(userLine);
 
-        const reply = options.freeform?.onSubmit(text) ?? null;
-        if (reply) {
-          const replyLine = document.createElement('p');
-          replyLine.className = 'dialogue-line dialogue-line-npc';
-          replyLine.textContent = `${options.speaker.toUpperCase()}: ${reply}`;
-          body.append(replyLine);
-        }
-
+        const historyBeforeReply = [...history];
+        history.push({ role: 'player', text });
         input.value = '';
+
+        const thinking = document.createElement('p');
+        thinking.className = 'dialogue-line dialogue-line-npc dialogue-line-thinking';
+        thinking.textContent = `${options.speaker.toUpperCase()}: ...`;
+        body.append(thinking);
         body.scrollTop = body.scrollHeight;
-        input.focus({ preventScroll: true });
+        setBusy(true);
+
+        try {
+          const reply = await options.freeform?.onSubmit(text, historyBeforeReply) ?? null;
+          if (this.root !== overlay) return;
+
+          thinking.remove();
+          if (reply) {
+            const replyLine = document.createElement('p');
+            replyLine.className = 'dialogue-line dialogue-line-npc';
+            replyLine.textContent = `${options.speaker.toUpperCase()}: ${reply}`;
+            body.append(replyLine);
+            history.push({ role: 'npc', text: reply });
+          }
+        } catch (error) {
+          console.error('Dialogue submission failed.', error);
+          if (this.root !== overlay) return;
+          thinking.textContent = `${options.speaker.toUpperCase()}: “Give me a second. Something interrupted that.”`;
+        } finally {
+          if (this.root === overlay) {
+            setBusy(false);
+            body.scrollTop = body.scrollHeight;
+            input.focus({ preventScroll: true });
+          }
+        }
       };
 
       form.addEventListener('submit', (event) => {
         event.preventDefault();
         event.stopPropagation();
-        submit();
+        void submit();
       });
       input.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && !event.shiftKey) {
           event.preventDefault();
-          submit();
+          void submit();
         }
       });
 
