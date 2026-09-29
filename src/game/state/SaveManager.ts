@@ -134,7 +134,7 @@ function normalizeCurrent(raw: Record<string, any>): CampaignSave {
       ? { ...fresh.world.flags, ...primitiveFlags(oldWorld.flags) }
       : fresh.world.flags,
     canonLedger: Array.isArray(oldWorld.canonLedger) ? oldWorld.canonLedger : fresh.world.canonLedger,
-    islands: isObject(oldWorld.islands) ? oldWorld.islands as typeof fresh.world.islands : fresh.world.islands,
+    islands: isObject(oldWorld.islands) ? { ...fresh.world.islands, ...oldWorld.islands as typeof fresh.world.islands } : fresh.world.islands,
     encounters: Array.isArray(oldWorld.encounters) ? oldWorld.encounters : fresh.world.encounters,
     knownGroups: isObject(oldWorld.knownGroups) ? oldWorld.knownGroups as typeof fresh.world.knownGroups : fresh.world.knownGroups,
     recruitCandidates: isObject(oldWorld.recruitCandidates) ? oldWorld.recruitCandidates as typeof fresh.world.recruitCandidates : fresh.world.recruitCandidates,
