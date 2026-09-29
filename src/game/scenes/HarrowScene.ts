@@ -270,12 +270,17 @@ export class HarrowScene extends Phaser.Scene {
 
   private updateHud(): void {
     const save = SaveManager.get();
-    this.hud.setText([
-      `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp}`,
-      `Stamina ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
-      `Pull familiarity ${Math.round(save.player.fruit.mastery * 100)}%`,
-      `Order: ${this.order.replace('-', ' ')}`,
-    ]);
+    this.hud.setText(this.mobile
+      ? [
+          `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp} · STM ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
+          `Pull familiarity ${Math.round(save.player.fruit.mastery * 100)}%`,
+        ]
+      : [
+          `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp}`,
+          `Stamina ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
+          `Pull familiarity ${Math.round(save.player.fruit.mastery * 100)}%`,
+          `Order: ${this.order.replace('-', ' ')}`,
+        ]);
     const alerted = this.enemies.filter((e) => e.alert && e.hp > 0).length;
     this.status.setText(`Harrow Docks\n${formatWorldTime(save)}${alerted ? `\n${alerted} alerted` : ''}`);
   }
