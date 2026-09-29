@@ -76,6 +76,13 @@ const checks = [
   ['dialogue can persist discovered facts to journal', dialogueMemory.includes('applyDialogueKnowledge') && dialogueMemory.includes('gullrock-voss-rumor') && dialogueMemory.includes('gullrock-marine-patrol')],
   ['AI actions are server validated per NPC', dialogueApi.includes('validateAction(profile, parsed)') && dialogueApi.includes('allowedKnowledge') && dialogueApi.includes('canControlHelm')],
   ['dialogue tracks interaction familiarity', dialogueMemory.includes('dialogueTurns-') && aiDialogue.includes('interactionCount')],
+  ['Luna is the default dialogue model', dialogueApi.includes("return process.env.OPENAI_WORLD_MODEL || 'gpt-6-luna'") || dialogueApi.includes("const economyModel = process.env.OPENAI_WORLD_MODEL || 'gpt-6-luna'")],
+  ['Sol is reserved for complex crew dialogue', dialogueApi.includes('complexity >= 4 ? deepModel : economyModel')],
+  ['routine ship commands can skip the API', aiDialogue.includes('zeroCostRoutine') && aiDialogue.includes("type: 'set_course'") && aiDialogue.includes("type: 'set_helm'")],
+  ['AI context is trimmed before sending', aiDialogue.includes('history.slice(-6)') && dialogueMemory.includes('query =') && dialogueApi.includes('source.knownEvents.slice(-4)')],
+  ['AI output budget is capped tightly', dialogueApi.includes('max_output_tokens: 500')],
+  ['credit exhaustion has a specific dialogue signal', dialogueApi.includes("code: 'credits_exhausted'") && aiDialogue.includes('AI CREDITS EMPTY')],
+  ['invalid API keys have a distinct dialogue signal', dialogueApi.includes("code: 'api_key_invalid'") && aiDialogue.includes('AI KEY INVALID/EXPIRED')],
 ];
 
 let failures = 0;
