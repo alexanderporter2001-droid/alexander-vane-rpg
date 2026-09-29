@@ -999,6 +999,7 @@ export class GullrockScene extends Phaser.Scene {
     this.hud.setVisible(false);
     this.crewHud.setVisible(false);
     this.mobile?.setVisible(false);
+    this.events.once('resume', () => { this.hud.setVisible(true); this.mobile?.setVisible(true); });
     this.scene.launch('PauseScene', { source: this.scene.key });
     this.scene.pause();
   }
