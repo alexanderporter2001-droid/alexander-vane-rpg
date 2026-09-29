@@ -8,6 +8,7 @@ import type {
   WorldEncounterState,
   WorldIslandState,
 } from '../state/types';
+import { isTimelineValidAdmiral } from './CanonTimeline';
 
 function hash(text: string): number {
   let h = 2166136261;
@@ -262,6 +263,9 @@ export function createMajorResponse(
   canonCharacterId: string,
 ): WorldEncounterState {
   if (!canonCharacterId.trim()) throw new Error('Major canon response requires an explicit timeline-valid character id.');
+  if (rank === 'admiral' && !isTimelineValidAdmiral(canonCharacterId)) {
+    throw new Error('Admiral response must use the canon office holder for the campaign timeline.');
+  }
   const seed = hash('response:' + locationId + ':' + save.world.day + ':' + canonCharacterId);
   const encounter: WorldEncounterState = {
     id: 'response-' + seed.toString(36),
