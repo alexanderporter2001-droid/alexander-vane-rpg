@@ -217,12 +217,12 @@ export class HarrowScene extends Phaser.Scene {
       pause: Phaser.Input.Keyboard.KeyCodes.ESC,
     }) as Record<string, Phaser.Input.Keyboard.Key>;
 
-    this.keys.attack.on('down', () => this.attack());
-    this.keys.pull.on('down', () => this.pull());
-    this.keys.dash.on('down', () => this.dash());
-    this.keys.interact.on('down', () => this.interactions.trigger());
-    this.keys.order.on('down', () => this.cycleOrder());
-    this.keys.pause.on('down', () => this.pauseGame());
+    this.keys.attack?.on('down', () => this.attack());
+    this.keys.pull?.on('down', () => this.pull());
+    this.keys.dash?.on('down', () => this.dash());
+    this.keys.interact?.on('down', () => this.interactions.trigger());
+    this.keys.order?.on('down', () => this.cycleOrder());
+    this.keys.pause?.on('down', () => this.pauseGame());
   }
 
   private createHud(): void {
@@ -709,8 +709,7 @@ export class HarrowScene extends Phaser.Scene {
       fontFamily: 'Georgia, serif',
       fontSize: '32px',
       color: '#c7b99e',
-      alpha: 0.34,
-    }).setDepth(-8);
+    }).setAlpha(0.34).setDepth(-8);
 
     this.add.sprite(1240, 145, 'wayward-gull').setScale(1.18).setDepth(10);
     this.add.text(1240, 70, 'WAYWARD GULL', {
