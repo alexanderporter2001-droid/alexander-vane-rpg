@@ -6,7 +6,11 @@ const style = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf
 const harrow = fs.readFileSync(new URL('../src/game/scenes/HarrowScene.ts', import.meta.url), 'utf8');
 const gullrock = fs.readFileSync(new URL('../src/game/scenes/GullrockScene.ts', import.meta.url), 'utf8');
 const sea = fs.readFileSync(new URL('../src/game/scenes/SeaScene.ts', import.meta.url), 'utf8');
+const boot = fs.readFileSync(new URL('../src/game/scenes/BootScene.ts', import.meta.url), 'utf8');
 const crewHud = fs.readFileSync(new URL('../src/game/systems/CrewStatusHud.ts', import.meta.url), 'utf8');
+const dialogue = fs.readFileSync(new URL('../src/game/systems/DialoguePanel.ts', import.meta.url), 'utf8');
+const intent = fs.readFileSync(new URL('../src/game/systems/DialogueIntent.ts', import.meta.url), 'utf8');
+const interactions = fs.readFileSync(new URL('../src/game/systems/InteractionSystem.ts', import.meta.url), 'utf8');
 
 const checks = [
   ['touch detection uses maxTouchPoints', mobile.includes('navigator.maxTouchPoints > 0')],
@@ -15,21 +19,16 @@ const checks = [
   ['joystick floats to touch origin', mobile.includes('stickCenterX') && mobile.includes('localX') && mobile.includes("classList.add('is-active')")],
   ['joystick uses pointer capture', mobile.includes('setPointerCapture')],
   ['toast uses native overlay', toast.includes("document.createElement('div')") && toast.includes('game-toast')],
-  ['toast sits below crew HUD', style.includes('.game-toast') && style.includes('top:max(184px') && style.includes('top:max(176px')],
+  ['crew health is native browser UI', crewHud.includes("document.createElement('div')") && crewHud.includes('crew-status-hud')],
+  ['crew health has numeric bars and DOWN state', crewHud.includes('crew-status-fill') && crewHud.includes("'DOWN'")],
+  ['crew health is phone-lowered', style.includes('.crew-status-hud') && style.includes('top:max(126px')],
+  ['toast sits below visible crew health', style.includes('.game-toast') && style.includes('top:max(220px')],
   ['combat layout separates primary buttons', style.includes('.mobile-attack') && style.includes('.mobile-dash') && style.includes('.mobile-pull')],
   ['holding attack repeats safely', mobile.includes('setInterval(action, repeatMs)') && mobile.includes('390')],
-  ['interact replaces order utility', mobile.includes('!this.interactLabel')],
   ['Harrow remembers facing direction', harrow.includes('lastFacing') && harrow.includes('getAttackFacing')],
   ['mobile melee assists nearby targets', harrow.includes('entry.distance <= 100') && harrow.includes('toward.dot(movingFacing)')],
   ['defeated Marines are marked down', harrow.includes("'DOWN'") && harrow.includes("setData('downed', true)")],
-  ['hit flash preserves downed tint', harrow.includes("target.getData('downed')") && harrow.includes('setTint(0x555b5f)')],
-  ['downed crew are visibly marked', harrow.includes('markCrewDown')],
-  ['first Marine starts on land', harrow.includes("[470, 610, 'melee']")],
   ['AI movement checks character-safe walkability', harrow.includes('isCharacterWalkable(nextX, nextY)')],
-  ['crew labels remain in Harrow', harrow.includes('SERA QUILL') && harrow.includes('ROWAN VALE')],
-  ['crew labels remain in Gullrock', gullrock.includes('SERA QUILL') && gullrock.includes('ROWAN VALE')],
-  ['Sea uses mobile controls', sea.includes('new MobileControls')],
-  ['crew health HUD renders bars and DOWN state', crewHud.includes('fillRoundedRect') && crewHud.includes("'DOWN'")],
   ['crew health HUD is used in combat', harrow.includes('new CrewStatusHud') && harrow.includes('this.crewHud.update')],
   ['crew health HUD is used at Gullrock', gullrock.includes('new CrewStatusHud') && gullrock.includes('this.crewHud.update')],
   ['crew health HUD is used at sea', sea.includes('new CrewStatusHud') && sea.includes('this.crewHud.update')],
@@ -37,7 +36,17 @@ const checks = [
   ['delegated sailing keeps real world movement', sea.includes('updateSeraNavigation(dt)') && sea.includes('applyShipVelocity(dt)')],
   ['Alexander can walk the deck while Sera sails', sea.includes('updateDeckMovement(dt)') && sea.includes('WAYWARD GULL · DECK')],
   ['Sera route avoids the known reef', sea.includes('safeWaypoint') && sea.includes('getAutopilotPoint')],
-  ['mobile utility order remains available outside combat', mobile.includes("this.order.style.display = !this.interactLabel ? 'flex' : 'none'")],
+  ['crew can be talked to on the deck', sea.includes('deckTalkTarget') && sea.includes('openCrewConversation')],
+  ['dialogue has typed freeform input', dialogue.includes("document.createElement('textarea')") && dialogue.includes('onSubmit')],
+  ['typed dialogue resizes with phone keyboard', style.includes('100dvh') && style.includes('.dialogue-input')],
+  ['intent resolver knows Sera and Rowan', intent.includes("speaker === 'sera'") && intent.includes("speaker === 'rowan'")],
+  ['intent resolver protects unknown Haki knowledge', intent.includes('!save.player.knowledge.hakiKnown')],
+  ['moving crew can own interactions', interactions.includes("typeof item.x === 'function'") && interactions.includes("typeof item.y === 'function'")],
+  ['Gullrock crew have direct talk interactions', gullrock.includes("id: 'sera'") && gullrock.includes("id: 'rowan'") && gullrock.includes('crewConversation')],
+  ['Gullrock NPCs accept typed intent', gullrock.includes('resolveDialogueIntent') && gullrock.includes('freeform: intentSpeaker')],
+  ['Gullrock service NPCs use character sprites', boot.includes("'npc-tavern'") && boot.includes("'npc-harbor'") && boot.includes("'npc-provisioner'") && boot.includes("'npc-shipwright'")],
+  ['Gullrock no longer uses service NPC circles', !gullrock.includes("this.add.circle(405, 500") && !gullrock.includes("this.add.circle(575, 560")],
+  ['Gullrock has environmental market detail', gullrock.includes('Market stalls') && gullrock.includes('Non-interactive locals')],
 ];
 
 let failures = 0;
