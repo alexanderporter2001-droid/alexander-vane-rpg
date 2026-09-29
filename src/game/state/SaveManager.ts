@@ -74,6 +74,7 @@ function normalizeCrew(raw: unknown, fallback?: CrewState): CrewState | null {
       techniques: Array.isArray(raw.progression.techniques) ? raw.progression.techniques.filter((value): value is string => typeof value === 'string') : fallback?.progression.techniques ?? [],
     } : fallback?.progression ?? { experience: 0, specialty: 0, techniques: [] },
     recruitedDay: typeof raw.recruitedDay === 'number' ? raw.recruitedDay : fallback?.recruitedDay ?? 1,
+    visualArchetype: typeof raw.visualArchetype === 'string' ? raw.visualArchetype : fallback?.visualArchetype,
   };
 }
 
