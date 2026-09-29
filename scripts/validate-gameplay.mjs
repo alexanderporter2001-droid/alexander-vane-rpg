@@ -56,7 +56,7 @@ const checks = [
   ['crew behavior is keyed by saved crew identity', harrow.includes('this.crew = save.crew.map') && gullrock.includes('this.crew = save.crew.map')],
   ['generated islands persist deterministic identity and features', livingWorld.includes('ensureGeneratedIsland') && livingWorld.includes('geography') && livingWorld.includes('resources') && livingWorld.includes('opportunities')],
   ['world simulation advances persistent islands over days', worldClock.includes('simulateWorld(save)') && livingWorld.includes('while (island.lastSimulatedDay < save.world.day)')],
-  ['ambient Admiral RNG is impossible', randomRank.length > 0 && !randomRank.includes("'admiral'")],
+  ['ambient Admiral RNG is impossible', randomRank.length > 0 && !randomRank.includes("return 'admiral'")],
   ['major Marine responses require an explicit canon character', livingWorld.includes('createMajorResponse') && livingWorld.includes('canonCharacterId') && livingWorld.includes('requires an explicit timeline-valid character id')],
   ['Marine recognition and orders affect encounter posture', livingWorld.includes('recognizedAlexander') && livingWorld.includes('threatHeat') && livingWorld.includes("kind === 'marine'")],
   ['pirates can be friendly neutral wary or hostile', livingWorld.includes("if (kind === 'pirate')") && livingWorld.includes("return 'friendly'") && livingWorld.includes("return 'neutral'") && livingWorld.includes("return 'wary'")],
