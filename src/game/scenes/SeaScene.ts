@@ -7,7 +7,7 @@ import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { equippedEffects } from '../systems/Equipment';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { Toast } from '../systems/Toast';
-import { advanceWorldClock } from '../systems/WorldClock';
+import { advanceWorldClock, advanceWorldMinutes, formatWorldTime } from '../systems/WorldClock';
 import { createEncounter, ensureKnownGroup } from '../systems/LivingWorld';
 import { crewCombatStats, fruitStats, playerCombatStats, recordCombatExperience, recordCrewExperience, recordFruitUse } from '../systems/Progression';
 
@@ -100,6 +100,8 @@ export class SeaScene extends Phaser.Scene {
   private boardingDamageGraceUntil = 0;
   private deckCrewAttackReady = new Map<string, number>();
   private navigationExperienceDistance = 0;
+  private nightShade?: Phaser.GameObjects.Rectangle;
+  private shipArea: 'deck' | 'quarters' | 'galley' | 'hold' = 'deck';
 
   constructor() { super('SeaScene'); }
 
@@ -135,6 +137,7 @@ export class SeaScene extends Phaser.Scene {
     this.toast = new Toast(this);
     this.dialogue = new DialoguePanel(this);
     this.createHud();
+    this.createNightOverlay();
     this.crewHud = new CrewStatusHud(this);
     this.crewHud.setVisible(false);
 
@@ -237,6 +240,7 @@ export class SeaScene extends Phaser.Scene {
     this.syncDeckToShip();
     this.updateSeaEncounter(dt);
     this.updateNavigation();
+    this.updateNightOverlay();
     this.updateHud();
 
     save.ship.x = this.ship.x;
@@ -649,8 +653,11 @@ export class SeaScene extends Phaser.Scene {
     }
 
     const canDock = Boolean(best && best.d <= 70 && Math.abs(this.speed) <= 28);
+    const areaAction = this.shipAreaAction();
     const talkTarget = this.deckTalkTarget();
-    if (talkTarget) {
+    if (areaAction) {
+      this.mobile?.setInteract(areaAction.label);
+    } else if (talkTarget) {
       const name = save.crew.find((member) => member.id === talkTarget)?.name.split(' ')[0] ?? 'Crew';
       this.mobile?.setInteract('Talk ' + name);
     } else if (this.activeEncounter && !this.activeEncounter.resolved && this.encounterDistance() <= 280) {
@@ -662,6 +669,11 @@ export class SeaScene extends Phaser.Scene {
 
   private contextAction(): void {
     if (this.dialogue.isOpen()) return;
+    const areaAction = this.shipAreaAction();
+    if (areaAction) {
+      areaAction.run();
+      return;
+    }
     const target = this.deckTalkTarget();
     if (target) {
       this.openCrewConversation(target);
@@ -712,7 +724,12 @@ export class SeaScene extends Phaser.Scene {
     this.dialogue.show({
       speaker,
       text: opening,
-      choices: [{ label: 'End conversation', run: () => undefined }],
+      choices: id === 'sera'
+        ? [
+            { label: 'Choose destination / view routes', run: () => this.openNavigationMenu() },
+            { label: 'End conversation', run: () => undefined },
+          ]
+        : [{ label: 'End conversation', run: () => undefined }],
       freeform: {
         placeholder: 'Say anything to ' + speaker + '...',
         onSubmit: async (message, history) => {
@@ -1272,7 +1289,9 @@ export class SeaScene extends Phaser.Scene {
     ));
     this.nav.setText([
       this.navTarget.name,
-      dist + ' m ' + bearing,
+      this.formatEta(this.estimateTravelMinutes(this.navTarget)) + ' ETA · ' + bearing,
+      formatWorldTime(save),
+      this.shipArea === 'deck' ? 'Main deck' : this.shipAreaLabel(),
     ]);
 
     this.crewHud.update(save.crew.map((member) => ({
@@ -1281,6 +1300,198 @@ export class SeaScene extends Phaser.Scene {
       hp: member.hp,
       maxHp: member.maxHp,
     })));
+  }
+
+  private openNavigationMenu(): void {
+    const save = SaveManager.get();
+    const choices = this.ports.map((port) => {
+      const island = save.world.islands[port.id === 'harrow' ? 'harrow-island' : 'gullrock'];
+      const known = port.id === 'harrow' || Boolean(island?.discovered) || Boolean(save.world.flags.gullrockDiscovered);
+      const eta = this.formatEta(this.estimateTravelMinutes(port));
+      const knowledge = known && island
+        ? this.knownDestinationSummary(island.marinePresence, island.danger)
+        : 'No reliable local information';
+      return {
+        label: port.name + ' · ' + eta + ' · ' + knowledge,
+        run: () => this.setSeraCourse(port),
+      };
+    });
+    choices.push({ label: 'Keep current course', run: () => undefined });
+
+    this.dialogue.show({
+      speaker: 'Sera Quill · Navigation',
+      text: 'Known routes from our current position. Times are estimates and can change with conditions. This menu is local game logic—no AI call.',
+      choices,
+      onClose: () => this.mobile?.setVisible(true),
+    });
+  }
+
+  private setSeraCourse(port: Port): void {
+    const save = SaveManager.get();
+    save.world.flags.shipDestination = port.id;
+    save.world.flags.sailingDelegated = true;
+    this.navTarget = port;
+    this.navigationMode = 'sera';
+    this.arrivalReady = false;
+    this.arrivalNotifiedPortId = null;
+    if (this.speed < 35) this.speed = 52;
+    this.applyNavigationPresentation(false);
+    SaveManager.save();
+    this.toast.show('Sera sets a course for ' + port.name + ' · ' + this.formatEta(this.estimateTravelMinutes(port)) + ' estimated.', 3600);
+  }
+
+  private estimateTravelMinutes(port: Port): number {
+    const distance = Phaser.Math.Distance.Between(this.ship.x, this.ship.y, port.approachX, port.approachY);
+    const sera = SaveManager.get().crew.find((member) => member.id === 'sera');
+    const skill = sera?.progression.specialty ?? 0;
+    const effective = 3.8 + skill * 1.4;
+    return Math.max(20, Math.round(distance / effective));
+  }
+
+  private formatEta(minutes: number): string {
+    const rounded = Math.max(10, Math.round(minutes / 10) * 10);
+    const hours = Math.floor(rounded / 60);
+    const mins = rounded % 60;
+    if (hours <= 0) return '~' + mins + 'm';
+    return '~' + hours + 'h' + (mins ? ' ' + mins + 'm' : '');
+  }
+
+  private knownDestinationSummary(marinePresence: number, danger: number): string {
+    const marine = marinePresence >= 0.6 ? 'heavy Marine presence' : marinePresence >= 0.3 ? 'some Marine presence' : 'light Marine presence';
+    const risk = danger >= 0.65 ? 'high known danger' : danger >= 0.4 ? 'some known danger' : 'lower known danger';
+    return marine + ' · ' + risk;
+  }
+
+  private shipAreaAction(): { label: string; run: () => void } | null {
+    if (this.navigationMode !== 'sera' || !this.deck?.visible || this.boardingActive) return null;
+    if (this.shipArea !== 'deck') {
+      return { label: 'Return deck', run: () => this.enterShipArea('deck') };
+    }
+
+    const x = this.deckPlayerLocal.x;
+    const y = this.deckPlayerLocal.y;
+    if (y >= 82) return { label: 'Quarters', run: () => this.enterShipArea('quarters') };
+    if (x <= -46 && y >= 20) return { label: 'Galley', run: () => this.enterShipArea('galley') };
+    if (x >= 46 && y >= 20) return { label: 'Cargo hold', run: () => this.enterShipArea('hold') };
+    return null;
+  }
+
+  private enterShipArea(area: 'deck' | 'quarters' | 'galley' | 'hold'): void {
+    this.shipArea = area;
+    if (area === 'deck') {
+      this.deck?.setVisible(true);
+      this.toast.show('You return to the main deck.', 1800);
+      return;
+    }
+    this.openShipAreaMenu(area);
+  }
+
+  private openShipAreaMenu(area: 'quarters' | 'galley' | 'hold'): void {
+    this.mobile?.setVisible(false);
+    const save = SaveManager.get();
+    const choices: Array<{ label: string; run: () => void; disabled?: boolean }> = [];
+
+    if (area === 'quarters') {
+      choices.push(
+        { label: 'Sleep 4 hours · recover 12 HP', run: () => this.restAboard(240, 12) },
+        { label: 'Sleep 8 hours · recover 24 HP', run: () => this.restAboard(480, 24) },
+      );
+    } else if (area === 'galley') {
+      const rations = save.inventory['Rations'] ?? 0;
+      choices.push({
+        label: rations > 0 ? 'Eat and rest · 30m · recover 6 HP' : 'Eat and rest · no rations',
+        disabled: rations <= 0,
+        run: () => {
+          const current = SaveManager.get();
+          if ((current.inventory['Rations'] ?? 0) <= 0) return;
+          current.inventory['Rations'] -= 1;
+          this.performTimedShipActivity(30, 6, 'You eat and take a short rest in the galley.');
+        },
+      });
+    } else {
+      choices.push({ label: 'Check supplies · 10m', run: () => {
+        const current = SaveManager.get();
+        advanceWorldMinutes(current, 10);
+        SaveManager.save();
+        this.toast.show('Cargo checked · ship supplies ' + Math.round(current.ship.supplies) + '/100.', 2600);
+      }});
+    }
+    choices.push({ label: 'Return to main deck', run: () => this.enterShipArea('deck') });
+
+    this.dialogue.show({
+      speaker: 'Wayward Gull · ' + this.shipAreaLabel(),
+      text: area === 'quarters'
+        ? 'Your bunk gives you a reliable place to sleep at sea. Rest helps ordinary injuries; severe wounds still need proper treatment.'
+        : area === 'galley'
+          ? 'The galley is cramped but usable while Sera keeps the Gull on course.'
+          : 'Rations, water, rope, and spare gear are stowed below.',
+      choices,
+      onClose: () => {
+        this.shipArea = 'deck';
+        this.mobile?.setVisible(true);
+      },
+    });
+  }
+
+  private restAboard(minutes: number, hp: number): void {
+    this.performTimedShipActivity(minutes, hp, 'You sleep while Sera keeps the Gull on course.');
+  }
+
+  private performTimedShipActivity(minutes: number, hpRecovery: number, message: string): void {
+    const save = SaveManager.get();
+    const travelMinutes = this.navigationMode === 'sera' && !this.arrivalReady
+      ? Math.min(minutes, this.estimateTravelMinutes(this.navTarget))
+      : 0;
+
+    if (travelMinutes > 0) this.advanceVoyageByMinutes(travelMinutes);
+    advanceWorldMinutes(save, minutes);
+    save.player.hp = Math.min(save.player.maxHp, save.player.hp + hpRecovery);
+    save.player.stamina = save.player.maxStamina;
+    SaveManager.save();
+    this.shipArea = 'deck';
+    this.toast.show(message + ' ' + formatWorldTime(save) + '.', 3600);
+  }
+
+  private advanceVoyageByMinutes(minutes: number): void {
+    const total = this.estimateTravelMinutes(this.navTarget);
+    if (minutes >= total) {
+      this.ship.setPosition(this.navTarget.approachX, this.navTarget.approachY);
+      this.speed = 0;
+      this.enterArrivalApproach();
+      return;
+    }
+    const ratio = Phaser.Math.Clamp(minutes / total, 0, 0.92);
+    const target = new Phaser.Math.Vector2(this.navTarget.approachX, this.navTarget.approachY);
+    this.ship.x = Phaser.Math.Linear(this.ship.x, target.x, ratio);
+    this.ship.y = Phaser.Math.Linear(this.ship.y, target.y, ratio);
+    this.syncDeckToShip();
+  }
+
+  private shipAreaLabel(): string {
+    if (this.shipArea === 'quarters') return 'Captain’s quarters';
+    if (this.shipArea === 'galley') return 'Galley';
+    if (this.shipArea === 'hold') return 'Cargo hold';
+    return 'Main deck';
+  }
+
+  private createNightOverlay(): void {
+    this.nightShade = this.add.rectangle(0, 0, this.scale.width, this.scale.height, 0x07101f, 0)
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(2200)
+      .setBlendMode(Phaser.BlendModes.MULTIPLY);
+    this.scale.on('resize', (size: Phaser.Structs.Size) => this.nightShade?.setSize(size.width, size.height));
+    this.updateNightOverlay();
+  }
+
+  private updateNightOverlay(): void {
+    if (!this.nightShade) return;
+    const minute = SaveManager.get().world.minuteOfDay;
+    let alpha = 0;
+    if (minute >= 20 * 60 || minute < 5 * 60) alpha = 0.48;
+    else if (minute >= 18 * 60) alpha = ((minute - 18 * 60) / 120) * 0.48;
+    else if (minute < 7 * 60) alpha = ((7 * 60 - minute) / 120) * 0.48;
+    this.nightShade.setAlpha(Phaser.Math.Clamp(alpha, 0, 0.48));
   }
 
   private cardinal(angle: number): string {

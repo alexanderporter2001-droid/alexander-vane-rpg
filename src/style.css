@@ -443,3 +443,7 @@ body.journal-open .mobile-controls,
 body.journal-open .crew-status-hud,
 body.journal-open .dialogue-overlay,
 body.journal-open .game-toast { display: none !important; }
+
+
+/* Ship navigation/area menus reuse the deterministic dialogue-choice surface. */
+body.ship-menu-open .mobile-controls{display:none!important}
