@@ -118,6 +118,10 @@ export class SeaScene extends Phaser.Scene {
       .setScale(0.85);
     this.ship.setBodySize(54, 94).setOffset(31, 52);
 
+    // A prior save may place the Gull inside shoreline geometry. Recover it to
+    // navigable water before restoring Sera's helm/autopilot state.
+    this.recoverShipFromIslandLand();
+
     this.speed = save.ship.speed;
     this.heading = save.ship.heading;
     this.ship.setRotation(this.heading + Math.PI / 2);
@@ -1303,9 +1307,30 @@ export class SeaScene extends Phaser.Scene {
     this.scene.pause();
   }
 
+  private recoverShipFromIslandLand(): void {
+    const save = SaveManager.get();
+    const overlapping = this.ports
+      .map((port) => ({
+        port,
+        distance: Phaser.Math.Distance.Between(this.ship.x, this.ship.y, port.x, port.y),
+      }))
+      .filter(({ port }) => this.isInsideIslandLand(this.ship.x, this.ship.y, port))
+      .sort((a, b) => a.distance - b.distance)[0];
+
+    if (!overlapping) return;
+
+    const { port } = overlapping;
+    this.ship.setPosition(port.approachX, port.approachY);
+    save.ship.x = port.approachX;
+    save.ship.y = port.approachY;
+    save.ship.speed = 0;
+    SaveManager.save();
+  }
+
   private isInsideIslandLand(x: number, y: number, port: Port): boolean {
-    const dx = (x - port.x) / (port.radius * 1.02);
-    const dy = (y - port.y) / (port.radius * 0.68);
+    // Include visible shoreline plus clearance for the Gull's body.
+    const dx = (x - port.x) / (port.radius * 1.14);
+    const dy = (y - port.y) / (port.radius * 0.8);
     return dx * dx + dy * dy < 1;
   }
 
