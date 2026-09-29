@@ -29,6 +29,7 @@ export class PauseScene extends Phaser.Scene {
 
   create(data: PauseData): void {
     this.source = data.source || 'HarrowScene';
+    document.body.classList.add('journal-open');
     const { width, height } = this.scale;
 
     this.add.rectangle(0, 0, width, height, 0x020609, 0.88)
@@ -71,7 +72,10 @@ export class PauseScene extends Phaser.Scene {
 
     this.input.keyboard?.once('keydown-ESC', () => this.resumeGame());
     this.scale.on('resize', this.onResize, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off('resize', this.onResize, this));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off('resize', this.onResize, this);
+      document.body.classList.remove('journal-open');
+    });
   }
 
   private makeTab(label: string, x: number, y: number, tab: Tab): Phaser.GameObjects.Text {
