@@ -3,6 +3,7 @@ import { SaveManager } from '../state/SaveManager';
 import { DialoguePanel } from '../systems/DialoguePanel';
 import { resolveDialogueAI } from '../systems/DialogueAI';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
+import { equippedEffects } from '../systems/Equipment';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { Toast } from '../systems/Toast';
 import { advanceWorldClock, formatWorldTime } from '../systems/WorldClock';
@@ -264,10 +265,13 @@ export class SeaScene extends Phaser.Scene {
       return;
     }
 
+    const sera = SaveManager.get().crew.find((member) => member.id === 'sera');
+    const awareness = sera ? equippedEffects(sera.equipment).seaAwarenessBonus : 0;
+
     let targetSpeed = 155;
-    if (approachDistance < 520) targetSpeed = 92;
-    if (approachDistance < 250) targetSpeed = 54;
-    if (approachDistance < 110) targetSpeed = 24;
+    if (approachDistance < 520 + awareness) targetSpeed = 92;
+    if (approachDistance < 250 + awareness * 0.45) targetSpeed = 54;
+    if (approachDistance < 110 + awareness * 0.2) targetSpeed = 24;
 
     const accel = targetSpeed > this.speed ? 54 : 82;
     this.speed = Phaser.Math.Linear(this.speed, targetSpeed, Phaser.Math.Clamp((accel * dt) / 160, 0, 1));
@@ -799,6 +803,7 @@ export class SeaScene extends Phaser.Scene {
     this.hud.setText([
       `Wayward Gull · Hull ${Math.ceil(save.ship.hull)}/${save.ship.maxHull}`,
       `Supplies ${Math.floor(save.ship.supplies)} · Speed ${Math.round(Math.abs(this.speed))}`,
+      `Berries ${save.player.berries.toLocaleString()}`,
       delegated
         ? `Sera at helm · course: ${this.navTarget.name}`
         : 'Alexander at helm · R / ORDER gives helm to Sera',
