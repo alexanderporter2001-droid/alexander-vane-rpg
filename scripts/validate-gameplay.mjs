@@ -6,6 +6,7 @@ const style = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf
 const harrow = fs.readFileSync(new URL('../src/game/scenes/HarrowScene.ts', import.meta.url), 'utf8');
 const gullrock = fs.readFileSync(new URL('../src/game/scenes/GullrockScene.ts', import.meta.url), 'utf8');
 const sea = fs.readFileSync(new URL('../src/game/scenes/SeaScene.ts', import.meta.url), 'utf8');
+const crewHud = fs.readFileSync(new URL('../src/game/systems/CrewStatusHud.ts', import.meta.url), 'utf8');
 
 const checks = [
   ['touch detection uses maxTouchPoints', mobile.includes('navigator.maxTouchPoints > 0')],
@@ -14,7 +15,7 @@ const checks = [
   ['joystick floats to touch origin', mobile.includes('stickCenterX') && mobile.includes('localX') && mobile.includes("classList.add('is-active')")],
   ['joystick uses pointer capture', mobile.includes('setPointerCapture')],
   ['toast uses native overlay', toast.includes("document.createElement('div')") && toast.includes('game-toast')],
-  ['toast sits below top HUD', style.includes('.game-toast') && style.includes('top:max(108px') && style.includes('top:max(102px')],
+  ['toast sits below crew HUD', style.includes('.game-toast') && style.includes('top:max(184px') && style.includes('top:max(176px')],
   ['combat layout separates primary buttons', style.includes('.mobile-attack') && style.includes('.mobile-dash') && style.includes('.mobile-pull')],
   ['holding attack repeats safely', mobile.includes('setInterval(action, repeatMs)') && mobile.includes('390')],
   ['interact replaces order utility', mobile.includes('!this.interactLabel')],
@@ -28,6 +29,15 @@ const checks = [
   ['crew labels remain in Harrow', harrow.includes('SERA QUILL') && harrow.includes('ROWAN VALE')],
   ['crew labels remain in Gullrock', gullrock.includes('SERA QUILL') && gullrock.includes('ROWAN VALE')],
   ['Sea uses mobile controls', sea.includes('new MobileControls')],
+  ['crew health HUD renders bars and DOWN state', crewHud.includes('fillRoundedRect') && crewHud.includes("'DOWN'")],
+  ['crew health HUD is used in combat', harrow.includes('new CrewStatusHud') && harrow.includes('this.crewHud.update')],
+  ['crew health HUD is used at Gullrock', gullrock.includes('new CrewStatusHud') && gullrock.includes('this.crewHud.update')],
+  ['crew health HUD is used at sea', sea.includes('new CrewStatusHud') && sea.includes('this.crewHud.update')],
+  ['Sera can own the helm', sea.includes("NavigationMode = 'manual' | 'sera'") && sea.includes('toggleNavigationMode')],
+  ['delegated sailing keeps real world movement', sea.includes('updateSeraNavigation(dt)') && sea.includes('applyShipVelocity(dt)')],
+  ['Alexander can walk the deck while Sera sails', sea.includes('updateDeckMovement(dt)') && sea.includes('WAYWARD GULL · DECK')],
+  ['Sera route avoids the known reef', sea.includes('safeWaypoint') && sea.includes('getAutopilotPoint')],
+  ['mobile utility order remains available outside combat', mobile.includes("this.order.style.display = !this.interactLabel ? 'flex' : 'none'")],
 ];
 
 let failures = 0;

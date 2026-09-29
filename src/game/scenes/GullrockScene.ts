@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
 import { DialoguePanel, type DialogueChoice } from '../systems/DialoguePanel';
+import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
@@ -18,6 +19,7 @@ export class GullrockScene extends Phaser.Scene {
   private dialogue!: DialoguePanel;
   private toast!: Toast;
   private hud!: Phaser.GameObjects.Text;
+  private crewHud!: CrewStatusHud;
   private lastValid = new Phaser.Math.Vector2(725, 790);
   private lastSaveAt = 0;
 
@@ -53,6 +55,7 @@ export class GullrockScene extends Phaser.Scene {
     this.interactions = new InteractionSystem(this.player);
     this.registerInteractions();
     this.createHud();
+    this.crewHud = new CrewStatusHud(this, 14, 112);
 
     if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {
@@ -607,6 +610,8 @@ export class GullrockScene extends Phaser.Scene {
     save.ship.y = 830;
     save.ship.heading = Math.PI;
     save.ship.speed = 32;
+    save.world.flags.shipDestination = 'harrow';
+    save.world.flags.sailingDelegated = true;
     SaveManager.save();
 
     this.cameras.main.fadeOut(350, 5, 12, 18);
@@ -641,6 +646,12 @@ export class GullrockScene extends Phaser.Scene {
         ? 'Use INTERACT near people and objects'
         : 'F near people and objects',
     ]);
+    this.crewHud.update(save.crew.map((member) => ({
+      id: member.id,
+      name: member.name,
+      hp: member.hp,
+      maxHp: member.maxHp,
+    })));
   }
 
   private isWalkable(x: number, y: number): boolean {

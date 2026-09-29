@@ -1,6 +1,6 @@
 import type { CampaignSave } from './types';
 
-export const GAME_VERSION = '0.3.5';
+export const GAME_VERSION = '0.3.6';
 export const SAVE_VERSION = 3 as const;
 
 export function createDefaultCampaign(): CampaignSave {
@@ -93,6 +93,8 @@ export function createDefaultCampaign(): CampaignSave {
         harrowEscaped: false,
         gullrockDiscovered: false,
         waywardGullDisabled: false,
+        sailingDelegated: true,
+        shipDestination: 'gullrock',
       },
       canonLedger: [],
     },

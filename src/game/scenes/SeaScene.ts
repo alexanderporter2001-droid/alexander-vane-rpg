@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
+import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { Toast } from '../systems/Toast';
 import { advanceWorldClock, formatWorldTime } from '../systems/WorldClock';
@@ -12,6 +13,8 @@ interface Port {
   radius: number;
 }
 
+type NavigationMode = 'manual' | 'sera';
+
 export class SeaScene extends Phaser.Scene {
   private readonly worldW = 4200;
   private readonly worldH = 3200;
@@ -19,6 +22,7 @@ export class SeaScene extends Phaser.Scene {
     { id: 'harrow', name: 'Harrow Island', x: 760, y: 1760, radius: 260 },
     { id: 'gullrock', name: 'Gullrock Port', x: 2790, y: 760, radius: 280 },
   ];
+  private readonly safeWaypoint = new Phaser.Math.Vector2(2300, 1850);
 
   private ship!: Phaser.Physics.Arcade.Sprite;
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
@@ -26,12 +30,23 @@ export class SeaScene extends Phaser.Scene {
   private toast!: Toast;
   private hud!: Phaser.GameObjects.Text;
   private nav!: Phaser.GameObjects.Text;
+  private crewHud!: CrewStatusHud;
   private wake!: Phaser.GameObjects.Particles.ParticleEmitter;
+
+  private navigationMode: NavigationMode = 'manual';
+  private navTarget!: Port;
   private speed = 0;
   private heading = -Math.PI / 2;
   private lastSaveAt = 0;
   private nearestPort: Port | null = null;
   private breachNotified = false;
+  private arrivalNotifiedPortId: Port['id'] | null = null;
+
+  private deck?: Phaser.GameObjects.Container;
+  private deckPlayer?: Phaser.GameObjects.Image;
+  private deckSera?: Phaser.GameObjects.Image;
+  private deckRowan?: Phaser.GameObjects.Image;
+  private deckPlayerLocal = new Phaser.Math.Vector2(0, 62);
 
   constructor() { super('SeaScene'); }
 
@@ -54,9 +69,15 @@ export class SeaScene extends Phaser.Scene {
     this.heading = save.ship.heading;
     this.ship.setRotation(this.heading + Math.PI / 2);
 
+    this.navTarget = this.resolveNavigationTarget();
+    this.navigationMode = this.canSeraNavigate() && save.world.flags.sailingDelegated !== false
+      ? 'sera'
+      : 'manual';
+
     this.createInput();
     this.toast = new Toast(this);
     this.createHud();
+    this.crewHud = new CrewStatusHud(this, 14, 96);
 
     if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {
@@ -64,15 +85,14 @@ export class SeaScene extends Phaser.Scene {
         secondary: () => undefined,
         dash: () => undefined,
         interact: () => this.tryDock(),
+        order: () => this.toggleNavigationMode(),
         pause: () => this.pauseGame(),
       });
       this.mobile.setCombatVisible(false);
     }
 
-    this.cameras.main.startFollow(this.ship, true, 0.08, 0.08);
-    this.cameras.main.setZoom(this.scale.width < 700 ? 0.82 : 0.95);
-
-    this.toast.show('Sera: Gullrock lies northeast. Hold a heading; the sea is actual distance now.', 3300);
+    this.createDeckView();
+    this.applyNavigationPresentation(false);
 
     const particles = this.add.particles(0, 0, 'bullet', {
       speed: { min: 8, max: 24 },
@@ -85,6 +105,13 @@ export class SeaScene extends Phaser.Scene {
       tint: 0xb8e2ec,
     });
     this.wake = particles;
+
+    if (this.navigationMode === 'sera') {
+      if (Math.abs(this.speed) < 35) this.speed = 52;
+      this.toast.show(`Sera takes the helm for ${this.navTarget.name}. You are free to move around the deck.`, 3600);
+    } else {
+      this.toast.show('No navigator is currently handling the helm. Alexander must steer.', 3300);
+    }
   }
 
   update(_time: number, deltaMs: number): void {
@@ -96,7 +123,22 @@ export class SeaScene extends Phaser.Scene {
       save.ship.supplies = Math.max(0, save.ship.supplies - dt * 0.004);
     }
 
-    this.updateShip(dt);
+    if (this.navigationMode === 'sera') {
+      if (!this.canSeraNavigate()) {
+        this.navigationMode = 'manual';
+        save.world.flags.sailingDelegated = false;
+        this.toast.show('Sera cannot navigate right now. Alexander has to take the helm.', 3400);
+        this.applyNavigationPresentation();
+      } else {
+        this.updateSeraNavigation(dt);
+        this.updateDeckMovement(dt);
+      }
+    } else {
+      this.updateManualShip(dt);
+    }
+
+    this.applyShipVelocity(dt);
+    this.syncDeckToShip();
     this.updateNavigation();
     this.updateHud();
 
@@ -125,32 +167,34 @@ export class SeaScene extends Phaser.Scene {
       up2: Phaser.Input.Keyboard.KeyCodes.UP,
       down2: Phaser.Input.Keyboard.KeyCodes.DOWN,
       dock: 'F',
+      delegate: 'R',
       pause: Phaser.Input.Keyboard.KeyCodes.ESC,
     }) as Record<string, Phaser.Input.Keyboard.Key>;
 
     this.keys.dock?.on('down', () => this.tryDock());
+    this.keys.delegate?.on('down', () => this.toggleNavigationMode());
     this.keys.pause?.on('down', () => this.pauseGame());
   }
 
-  private updateShip(dt: number): void {
-    const save = SaveManager.get();
-    if (save.world.flags.waywardGullDisabled || save.ship.hull <= 0) {
-      this.disableGull();
-      return;
-    }
-
-    const mobileX = this.mobile?.move.x ?? 0;
-    const mobileY = this.mobile?.move.y ?? 0;
-
-    const turn =
+  private getMoveInput(): Phaser.Math.Vector2 {
+    const x =
       (this.keys.right?.isDown || this.keys.right2?.isDown ? 1 : 0) -
       (this.keys.left?.isDown || this.keys.left2?.isDown ? 1 : 0) +
-      mobileX;
-
-    const throttle =
-      (this.keys.up?.isDown || this.keys.up2?.isDown ? 1 : 0) -
+      (this.mobile?.move.x ?? 0);
+    const y =
       (this.keys.down?.isDown || this.keys.down2?.isDown ? 1 : 0) -
-      mobileY;
+      (this.keys.up?.isDown || this.keys.up2?.isDown ? 1 : 0) +
+      (this.mobile?.move.y ?? 0);
+
+    const v = new Phaser.Math.Vector2(x, y);
+    if (v.lengthSq() > 1) v.normalize();
+    return v;
+  }
+
+  private updateManualShip(dt: number): void {
+    const move = this.getMoveInput();
+    const turn = move.x;
+    const throttle = -move.y;
 
     const steerStrength = Phaser.Math.Clamp(Math.abs(this.speed) / 125 + 0.28, 0.28, 1);
     this.heading += Phaser.Math.Clamp(turn, -1, 1) * 1.35 * steerStrength * dt;
@@ -160,6 +204,67 @@ export class SeaScene extends Phaser.Scene {
     else this.speed *= Math.pow(0.992, dt * 60);
 
     this.speed = Phaser.Math.Clamp(this.speed, -48, 205);
+  }
+
+  private updateSeraNavigation(dt: number): void {
+    const point = this.getAutopilotPoint();
+    const desired = Phaser.Math.Angle.Between(this.ship.x, this.ship.y, point.x, point.y);
+    const turn = Phaser.Math.Angle.Wrap(desired - this.heading);
+    this.heading += Phaser.Math.Clamp(turn, -1.1, 1.1) * 1.25 * dt;
+
+    const distanceToPort = Phaser.Math.Distance.Between(
+      this.ship.x,
+      this.ship.y,
+      this.navTarget.x,
+      this.navTarget.y,
+    );
+
+    let targetSpeed = 155;
+    if (distanceToPort < this.navTarget.radius + 360) targetSpeed = 92;
+    if (distanceToPort < this.navTarget.radius + 150) targetSpeed = 48;
+    if (distanceToPort <= this.navTarget.radius * 0.88) targetSpeed = 18;
+
+    const accel = targetSpeed > this.speed ? 54 : 82;
+    this.speed = Phaser.Math.Linear(this.speed, targetSpeed, Phaser.Math.Clamp((accel * dt) / 160, 0, 1));
+    this.speed = Phaser.Math.Clamp(this.speed, 0, 170);
+  }
+
+  private getAutopilotPoint(): Phaser.Math.Vector2 {
+    const waypointDistance = Phaser.Math.Distance.Between(
+      this.ship.x,
+      this.ship.y,
+      this.safeWaypoint.x,
+      this.safeWaypoint.y,
+    );
+
+    if (this.navTarget.id === 'gullrock' && this.ship.x < 2390 && waypointDistance > 190) {
+      return this.safeWaypoint;
+    }
+    if (this.navTarget.id === 'harrow' && this.ship.x > 2180 && waypointDistance > 190) {
+      return this.safeWaypoint;
+    }
+
+    return new Phaser.Math.Vector2(this.navTarget.x, this.navTarget.y);
+  }
+
+  private updateDeckMovement(dt: number): void {
+    if (!this.deckPlayer) return;
+
+    const move = this.getMoveInput();
+    this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x + move.x * 118 * dt, -66, 66);
+    this.deckPlayerLocal.y = Phaser.Math.Clamp(this.deckPlayerLocal.y + move.y * 118 * dt, -88, 106);
+
+    const taper = Math.abs(this.deckPlayerLocal.y) > 74 ? 54 : 66;
+    this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x, -taper, taper);
+    this.deckPlayer.setPosition(this.deckPlayerLocal.x, this.deckPlayerLocal.y);
+  }
+
+  private applyShipVelocity(dt: number): void {
+    const save = SaveManager.get();
+    if (save.world.flags.waywardGullDisabled || save.ship.hull <= 0) {
+      this.disableGull();
+      return;
+    }
 
     const vx = Math.cos(this.heading) * this.speed;
     const vy = Math.sin(this.heading) * this.speed;
@@ -177,6 +282,149 @@ export class SeaScene extends Phaser.Scene {
       if (Math.random() < 0.025) this.cameras.main.shake(70, 0.003);
       if (save.ship.hull <= 0) this.disableGull();
     }
+  }
+
+  private toggleNavigationMode(): void {
+    if (this.navigationMode === 'sera') {
+      this.navigationMode = 'manual';
+      SaveManager.get().world.flags.sailingDelegated = false;
+      this.toast.show('Alexander takes the helm. Sera steps away and watches the water.', 2600);
+      this.applyNavigationPresentation();
+      SaveManager.save();
+      return;
+    }
+
+    if (!this.canSeraNavigate()) {
+      this.toast.show('Sera is not able to take the helm right now.', 2600);
+      return;
+    }
+
+    this.navigationMode = 'sera';
+    SaveManager.get().world.flags.sailingDelegated = true;
+    if (this.speed < 35) this.speed = 52;
+    this.toast.show(`Sera takes the helm and resumes the course for ${this.navTarget.name}.`, 2900);
+    this.applyNavigationPresentation();
+    SaveManager.save();
+  }
+
+  private applyNavigationPresentation(showToast = true): void {
+    const delegated = this.navigationMode === 'sera';
+    this.ship.setVisible(!delegated);
+    this.deck?.setVisible(delegated);
+
+    if (delegated) {
+      this.cameras.main.startFollow(this.ship, true, 0.12, 0.12);
+      this.cameras.main.setZoom(this.scale.width < 700 ? 1.55 : 1.42);
+      this.mobile?.setOrderLabel('TAKE HELM');
+      if (showToast) this.toast.show('Sera has the course. Move freely around the deck.', 2300);
+    } else {
+      this.cameras.main.startFollow(this.ship, true, 0.08, 0.08);
+      this.cameras.main.setZoom(this.scale.width < 700 ? 0.82 : 0.95);
+      this.mobile?.setOrderLabel('SERA HELM');
+    }
+  }
+
+  private canSeraNavigate(): boolean {
+    const sera = SaveManager.get().crew.find((member) => member.id === 'sera');
+    return Boolean(sera && sera.hp > 0);
+  }
+
+  private resolveNavigationTarget(): Port {
+    const save = SaveManager.get();
+    const requested = save.world.flags.shipDestination;
+    if (requested === 'harrow' || requested === 'gullrock') {
+      const port = this.ports.find((candidate) => candidate.id === requested);
+      if (port) return port;
+    }
+
+    const byDistance = [...this.ports].sort((a, b) => {
+      const da = Phaser.Math.Distance.Between(save.ship.x, save.ship.y, a.x, a.y);
+      const db = Phaser.Math.Distance.Between(save.ship.x, save.ship.y, b.x, b.y);
+      return da - db;
+    });
+    const nearest = byDistance[0];
+    const target = nearest?.id === 'harrow'
+      ? this.ports.find((port) => port.id === 'gullrock')
+      : this.ports.find((port) => port.id === 'harrow');
+
+    const resolved = target ?? this.ports[1]!;
+    save.world.flags.shipDestination = resolved.id;
+    return resolved;
+  }
+
+  private createDeckView(): void {
+    const deck = this.add.container(this.ship.x, this.ship.y).setDepth(310);
+
+    const g = this.add.graphics();
+    g.fillStyle(0x0b0d0e, 0.28).fillEllipse(0, 12, 210, 320);
+    g.fillStyle(0x6f4e31, 1).fillRoundedRect(-92, -148, 184, 296, 62);
+    g.lineStyle(5, 0xb58b56, 0.92).strokeRoundedRect(-92, -148, 184, 296, 62);
+    g.lineStyle(2, 0x3e2b1d, 0.62);
+    for (let y = -110; y <= 110; y += 28) g.lineBetween(-78, y, 78, y);
+
+    g.fillStyle(0x4f351f, 1).fillRoundedRect(-64, 56, 128, 62, 10);
+    g.lineStyle(3, 0x271a11, 0.8).strokeRoundedRect(-64, 56, 128, 62, 10);
+
+    g.fillStyle(0x3a291b, 1).fillRect(-5, -126, 10, 170);
+    g.fillStyle(0xc6b289, 0.92).fillTriangle(8, -116, 8, -44, 70, -65);
+    g.fillStyle(0x172735, 1).fillCircle(0, -103, 18);
+    g.lineStyle(4, 0xb98a4c, 1).strokeCircle(0, -103, 18);
+
+    g.fillStyle(0x51371f, 1).fillRoundedRect(-78, 124, 156, 18, 8);
+    g.lineStyle(3, 0x2b1d13, 0.7).strokeRoundedRect(-78, 124, 156, 18, 8);
+
+    const title = this.add.text(0, -171, 'WAYWARD GULL · DECK', {
+      fontFamily: 'Georgia, serif',
+      fontSize: '12px',
+      fontStyle: 'bold',
+      color: '#f0e4c7',
+      backgroundColor: '#071116cc',
+      padding: { x: 8, y: 4 },
+    }).setOrigin(0.5);
+
+    this.deckPlayer = this.add.image(this.deckPlayerLocal.x, this.deckPlayerLocal.y, 'alexander')
+      .setScale(0.58)
+      .setDepth(8);
+    this.deckSera = this.add.image(0, -80, 'sera').setScale(0.54).setDepth(7);
+    this.deckRowan = this.add.image(48, 22, 'rowan').setScale(0.56).setDepth(7);
+
+    const seraLabel = this.add.text(0, -121, 'SERA · HELM', {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '9px',
+      fontStyle: 'bold',
+      color: '#d6edf6',
+      backgroundColor: '#071116bb',
+      padding: { x: 4, y: 2 },
+    }).setOrigin(0.5);
+
+    const rowanLabel = this.add.text(48, -20, 'ROWAN', {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '9px',
+      fontStyle: 'bold',
+      color: '#f0d9cb',
+      backgroundColor: '#071116bb',
+      padding: { x: 4, y: 2 },
+    }).setOrigin(0.5);
+
+    deck.add([g, title, this.deckSera, this.deckRowan, this.deckPlayer, seraLabel, rowanLabel]);
+    this.deck = deck;
+
+    const save = SaveManager.get();
+    const sera = save.crew.find((member) => member.id === 'sera');
+    const rowan = save.crew.find((member) => member.id === 'rowan');
+    if (sera && sera.hp <= 0) {
+      this.deckSera.setTint(0x555b5f).setAlpha(0.7).setAngle(90);
+      seraLabel.setText('SERA · DOWN').setColor('#ffd3ca');
+    }
+    if (rowan && rowan.hp <= 0) {
+      this.deckRowan.setTint(0x555b5f).setAlpha(0.7).setAngle(90);
+      rowanLabel.setText('ROWAN · DOWN').setColor('#ffd3ca');
+    }
+  }
+
+  private syncDeckToShip(): void {
+    if (!this.deck) return;
+    this.deck.setPosition(this.ship.x, this.ship.y);
   }
 
   private disableGull(): void {
@@ -239,14 +487,25 @@ export class SeaScene extends Phaser.Scene {
     const gullrock = this.ports[1];
     if (gullrock) {
       const d = Phaser.Math.Distance.Between(this.ship.x, this.ship.y, gullrock.x, gullrock.y);
-      if (d < 700 && !SaveManager.get().world.flags.gullrockDiscovered) {
-        SaveManager.get().world.flags.gullrockDiscovered = true;
+      if (d < 700 && !save.world.flags.gullrockDiscovered) {
+        save.world.flags.gullrockDiscovered = true;
         this.toast.show('Sera: Land ahead. Gullrock Port.');
       }
     }
 
     const canDock = Boolean(best && best.d <= best.port.radius && Math.abs(this.speed) <= 65);
-    this.mobile?.setInteract(canDock ? 'Dock' : null);
+    this.mobile?.setInteract(canDock ? `Dock ${best?.port.name ?? ''}` : null);
+
+    if (
+      this.navigationMode === 'sera' &&
+      best &&
+      best.port.id === this.navTarget.id &&
+      best.d <= best.port.radius &&
+      this.arrivalNotifiedPortId !== best.port.id
+    ) {
+      this.arrivalNotifiedPortId = best.port.id;
+      this.toast.show(`Sera: We're at ${best.port.name}. Give the word and I'll bring us in.`, 3600);
+    }
   }
 
   private tryDock(): void {
@@ -282,6 +541,7 @@ export class SeaScene extends Phaser.Scene {
       save.world.scene = 'gullrock';
       save.world.locationId = 'gullrock-port';
       save.world.flags.gullrockDiscovered = true;
+      save.world.flags.shipDestination = 'harrow';
       save.player.position = { x: 620, y: 760 };
       SaveManager.save();
       this.scene.start('GullrockScene');
@@ -290,6 +550,7 @@ export class SeaScene extends Phaser.Scene {
 
     save.world.scene = 'harrow';
     save.world.locationId = 'harrow-island';
+    save.world.flags.shipDestination = 'gullrock';
     save.player.position = { x: 1230, y: 265 };
     SaveManager.save();
     this.scene.start('HarrowScene');
@@ -319,22 +580,42 @@ export class SeaScene extends Phaser.Scene {
 
   private updateHud(): void {
     const save = SaveManager.get();
+    const delegated = this.navigationMode === 'sera';
     this.hud.setText([
       `Wayward Gull · Hull ${Math.ceil(save.ship.hull)}/${save.ship.maxHull}`,
       `Supplies ${Math.floor(save.ship.supplies)} · Speed ${Math.round(Math.abs(this.speed))}`,
-      save.world.flags.waywardGullDisabled
-        ? 'DISABLED · F / INTERACT emergency patch'
+      delegated
+        ? `Sera at helm · course: ${this.navTarget.name}`
+        : 'Alexander at helm · R / ORDER gives helm to Sera',
+      delegated
+        ? 'Walk the deck freely · R / ORDER takes the helm'
         : 'W/S throttle · A/D steer · F dock',
     ]);
 
-    const gullrock = this.ports[1];
-    const dist = gullrock ? Math.round(Phaser.Math.Distance.Between(this.ship.x, this.ship.y, gullrock.x, gullrock.y)) : 0;
-    const bearing = gullrock ? this.cardinal(Phaser.Math.Angle.Between(this.ship.x, this.ship.y, gullrock.x, gullrock.y)) : '—';
+    const dist = Math.round(Phaser.Math.Distance.Between(
+      this.ship.x,
+      this.ship.y,
+      this.navTarget.x,
+      this.navTarget.y,
+    ));
+    const bearing = this.cardinal(Phaser.Math.Angle.Between(
+      this.ship.x,
+      this.ship.y,
+      this.navTarget.x,
+      this.navTarget.y,
+    ));
     this.nav.setText([
       formatWorldTime(save),
-      `Gullrock: ${dist} m ${bearing}`,
+      `${this.navTarget.name}: ${dist} m ${bearing}`,
       `World position: ${Math.round(this.ship.x)}, ${Math.round(this.ship.y)}`,
     ]);
+
+    this.crewHud.update(save.crew.map((member) => ({
+      id: member.id,
+      name: member.name,
+      hp: member.hp,
+      maxHp: member.maxHp,
+    })));
   }
 
   private cardinal(angle: number): string {
@@ -350,6 +631,7 @@ export class SeaScene extends Phaser.Scene {
     save.ship.y = this.ship.y;
     save.ship.heading = this.heading;
     save.ship.speed = this.speed;
+    save.world.flags.sailingDelegated = this.navigationMode === 'sera';
     SaveManager.save();
     this.scene.launch('PauseScene', { source: this.scene.key });
     this.scene.pause();

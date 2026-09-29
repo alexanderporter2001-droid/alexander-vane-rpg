@@ -131,7 +131,7 @@ export class MobileControls {
     this.interact.style.display = this.interactLabel ? 'flex' : 'none';
 
     if (this.order) {
-      this.order.style.display = this.combatVisible && !this.interactLabel ? 'flex' : 'none';
+      this.order.style.display = !this.interactLabel ? 'flex' : 'none';
     }
   }
 
