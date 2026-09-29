@@ -113,8 +113,8 @@ function relevantJournalEvents(save: CampaignSave, message: string, limit = 4): 
 }
 
 function buildContext(speaker: DialogueSpeakerId, save: CampaignSave, message: string) {
-  const crewSpeaker = speaker === 'sera' || speaker === 'rowan';
-  const member = crewSpeaker ? save.crew.find((candidate) => candidate.id === speaker) : undefined;
+  const member = save.crew.find((candidate) => candidate.id === speaker);
+  const crewSpeaker = Boolean(member);
 
   return {
     location: save.world.locationId,
@@ -128,6 +128,13 @@ function buildContext(speaker: DialogueSpeakerId, save: CampaignSave, message: s
       maxHull: save.ship.maxHull,
       supplies: save.ship.supplies,
     },
+    crewIdentity: member ? {
+      id: member.id,
+      name: member.name,
+      role: member.role,
+      notes: member.notes.slice(0, 8),
+      capabilities: member.capabilities.slice(0, 8),
+    } : null,
     speakerState: member ? {
       hp: member.hp,
       maxHp: member.maxHp,
