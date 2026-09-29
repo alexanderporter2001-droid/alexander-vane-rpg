@@ -4,7 +4,7 @@ A private, persistent, consequence-driven pirate RPG built around Alexander Vane
 
 This repository replaces the Floot prototype as the permanent source of truth. Hosting is replaceable; campaign continuity and versioned saves are not.
 
-## Current foundation — v0.3.11
+## Current foundation — v0.3.12
 
 The current vertical slice is built as a complete local loop rather than disconnected demos:
 
@@ -42,8 +42,12 @@ The current vertical slice is built as a complete local loop rather than disconn
 34. Elias, Nico, Maris, and Perrin are now full Gullrock conversation targets with distinct personalities and bounded local knowledge rather than decorative background labels.
 35. Typed dialogue can now produce validated world effects beyond speech: Sera can change course or hand over the helm, and NPCs can mark specifically approved local information as learned so it persists in the journal and world state.
 36. Dialogue-generated actions are constrained server-side per NPC; a local cannot grant themselves Sera's helm/course permissions or invent arbitrary state changes. Spending berries and other irreversible services still require explicit player confirmation.
+37. Cost routing is now economy-first: Luna handles ordinary dialogue even for core crew, while Sol is selected only for genuinely complex crew conversations such as leadership, trust, strategy, moral judgment, or deeper relationship discussion.
+38. Obvious ship orders such as setting a known course or handing the helm to Sera/Alexander are resolved locally at zero API cost when the wording is unambiguous.
+39. Per-turn context is aggressively trimmed: only the most relevant persistent memories and journal events plus the last few dialogue turns are sent, while the response budget is capped for concise NPC speech.
+40. Billing/quota exhaustion is surfaced distinctly in the conversation as “[AI CREDITS EMPTY — local dialogue fallback active]”; invalid/expired API keys use a separate warning so billing problems are not confused with connectivity errors.
 
-Typed freeform dialogue now has a live AI path with structured output, bounded context, prioritized persistent memories, private relationship impressions, and a local offline fallback. AI responses may propose only explicitly supported game actions; the simulation validates and applies them.
+Typed freeform dialogue now has a live AI path with structured output, relevance-selected context, prioritized persistent memories, private relationship impressions, economy-first model routing, zero-cost handling for obvious routine ship orders, and a local offline fallback. AI responses may propose only explicitly supported game actions; the simulation validates and applies them.
 
 ## Development
 

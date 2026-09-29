@@ -33,13 +33,86 @@ export interface DialogueAIResult {
 
 const DIALOGUE_ENDPOINT = 'https://alexander-vane-rpg.vercel.app/api/dialogue';
 
+function zeroCostRoutine(
+  speaker: DialogueSpeakerId,
+  message: string,
+): DialogueAIResult | null {
+  if (speaker !== 'sera') return null;
+  const text = message.toLowerCase().replace(/[^a-z0-9\s']/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const mentionsCourse = /\b(course|route|destination|head|sail|go)\b/.test(text);
+  const clearOrder = /\b(set|change|plot|take us|head|sail|go)\b/.test(text);
+
+  if (mentionsCourse && clearOrder && /\bharrow\b/.test(text)) {
+    return {
+      reply: '“Harrow. Got it. I’ll set the course.”',
+      source: 'local',
+      action: { type: 'set_course', target: 'harrow' },
+    };
+  }
+
+  if (mentionsCourse && clearOrder && /\bgullrock\b/.test(text)) {
+    return {
+      reply: '“Gullrock. I’ll put us on that course.”',
+      source: 'local',
+      action: { type: 'set_course', target: 'gullrock' },
+    };
+  }
+
+  const helmMentioned = /\b(helm|wheel|steer|steering)\b/.test(text);
+  if (helmMentioned && /\b(you take|take the|keep the|handle the|stay on)\b/.test(text)) {
+    return {
+      reply: '“I’ve got the helm.”',
+      source: 'local',
+      action: { type: 'set_helm', target: 'sera' },
+    };
+  }
+
+  if (helmMentioned && /\b(i'll take|i will take|let me take|i'm taking|i am taking)\b/.test(text)) {
+    return {
+      reply: '“All yours.”',
+      source: 'local',
+      action: { type: 'set_helm', target: 'alexander' },
+    };
+  }
+
+  return null;
+}
+
 function destination(save: CampaignSave): string {
   return typeof save.world.flags.shipDestination === 'string'
     ? save.world.flags.shipDestination
     : '';
 }
 
-function buildContext(speaker: DialogueSpeakerId, save: CampaignSave) {
+function relevantJournalEvents(save: CampaignSave, message: string, limit = 4): string[] {
+  const terms = new Set(
+    message
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .filter((term) => term.length >= 4),
+  );
+
+  return save.journal
+    .filter((entry) => entry.known)
+    .map((entry, index) => {
+      const text = `${entry.title} ${entry.body}`.toLowerCase();
+      let overlap = 0;
+      for (const term of terms) {
+        if (text.includes(term)) overlap += 1;
+      }
+      return {
+        text: `${entry.title}: ${entry.body}`,
+        score: overlap * 4 + index / Math.max(1, save.journal.length),
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((entry) => entry.text);
+}
+
+function buildContext(speaker: DialogueSpeakerId, save: CampaignSave, message: string) {
   const crewSpeaker = speaker === 'sera' || speaker === 'rowan';
   const member = crewSpeaker ? save.crew.find((candidate) => candidate.id === speaker) : undefined;
 
@@ -69,16 +142,14 @@ function buildContext(speaker: DialogueSpeakerId, save: CampaignSave) {
           maxHp: crew.maxHp,
         }))
       : [],
-    knownEvents: crewSpeaker
-      ? save.journal.filter((entry) => entry.known).slice(-10).map((entry) => `${entry.title}: ${entry.body}`)
-      : [],
+    knownEvents: crewSpeaker ? relevantJournalEvents(save, message, 4) : [],
     knowledgeState: {
       vossRumor: save.world.flags.gullrockVossRumorKnown === true,
       marinePatrol: save.world.flags.gullrockMarinePatrolKnown === true,
       northRoad: save.world.flags.gullrockNorthRoadRumorKnown === true,
       eastWind: save.world.flags.gullrockEastWindKnown === true,
     },
-    memories: dialogueMemories(save, speaker),
+    memories: dialogueMemories(save, speaker, message, 5),
     priorImpression: dialogueImpression(save, speaker),
     interactionCount: dialogueTurnCount(save, speaker),
     fruitKnownToCrew: crewSpeaker && save.player.fruit.eaten,
@@ -122,9 +193,13 @@ export async function resolveDialogueAI(
   save: CampaignSave,
   history: DialogueTurn[] = [],
 ): Promise<DialogueAIResult> {
+  recordDialogueTurn(save, speaker);
+
+  const routine = zeroCostRoutine(speaker, message);
+  if (routine) return routine;
+
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 18_000);
-  recordDialogueTurn(save, speaker);
 
   try {
     const response = await fetch(DIALOGUE_ENDPOINT, {
@@ -133,8 +208,8 @@ export async function resolveDialogueAI(
       body: JSON.stringify({
         speakerId: speaker,
         message,
-        history: history.slice(-10),
-        context: buildContext(speaker, save),
+        history: history.slice(-6),
+        context: buildContext(speaker, save, message),
       }),
       signal: controller.signal,
     });
@@ -191,8 +266,15 @@ export async function resolveDialogueAI(
     const diagnostic = error instanceof Error
       ? error.message.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48)
       : 'connection_error';
+
+    const statusLine = diagnostic === 'credits_exhausted'
+      ? '[AI CREDITS EMPTY — local dialogue fallback active]'
+      : diagnostic === 'api_key_invalid'
+        ? '[AI KEY INVALID/EXPIRED — local dialogue fallback active]'
+        : `[AI unavailable · local fallback · ${diagnostic || 'connection_error'}]`;
+
     return {
-      reply: `${local.reply}\n\n[AI unavailable · local fallback · ${diagnostic || 'connection_error'}]`,
+      reply: `${local.reply}\n\n${statusLine}`,
       source: 'local',
       action: { type: 'none', target: 'none' },
     };
