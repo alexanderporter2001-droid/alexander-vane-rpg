@@ -594,26 +594,15 @@ export class HarrowScene extends Phaser.Scene {
     this.player?.setVelocity(0, 0);
     for (const enemy of this.enemies) enemy.sprite.setVelocity(0, 0);
     for (const unit of this.crew) unit.sprite.setVelocity(0, 0);
-    this.mobile?.setCombatVisible(false);
-    this.mobile?.setInteract(null);
 
-    const { width, height } = this.scale;
-    this.add.rectangle(width / 2, height / 2, width, height, 0x020406, 0.82)
-      .setScrollFactor(0)
-      .setDepth(5000);
-    this.add.text(width / 2, height / 2 - 28, 'ALEXANDER VANE DIED', {
-      fontFamily: 'Georgia, serif',
-      fontSize: width < 600 ? '30px' : '46px',
-      color: '#f0d9d2',
-      fontStyle: 'bold',
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(5001);
-    this.add.text(width / 2, height / 2 + 32, 'This campaign is over. No automatic respawn or retcon was created.', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '14px',
-      color: '#c7d3d7',
-      align: 'center',
-      wordWrap: { width: Math.min(620, width - 50) },
-    }).setOrigin(0.5).setScrollFactor(0).setDepth(5001);
+    const save = SaveManager.get();
+    save.player.hp = 0;
+    save.world.flags.alexanderDead = true;
+    this.persist();
+    SaveManager.save();
+
+    this.cameras.main.fadeOut(320, 5, 7, 9);
+    this.time.delayedCall(340, () => this.scene.start('GameOverScene'));
   }
 
   private downEnemy(enemy: EnemyUnit): void {
