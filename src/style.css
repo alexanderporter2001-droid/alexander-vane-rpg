@@ -21,51 +21,49 @@ button,input,textarea{font:inherit}
   user-select:none;
   -webkit-user-select:none;
 }
-.mobile-joystick{
+.mobile-joystick-zone{
   position:absolute;
-  left:max(8px,env(safe-area-inset-left));
-  bottom:max(8px,env(safe-area-inset-bottom));
-  width:190px;
-  height:190px;
+  left:0;
+  bottom:0;
+  width:min(46vw,320px);
+  min-width:190px;
+  height:min(38vh,320px);
+  min-height:190px;
   pointer-events:auto;
   touch-action:none;
+  -webkit-tap-highlight-color:transparent;
 }
 .mobile-joystick-base,.mobile-joystick-nub{
   position:absolute;
-  left:50%;
-  top:50%;
   border-radius:50%;
   transform:translate(-50%,-50%);
   pointer-events:none;
+  transition:opacity .12s ease;
 }
 .mobile-joystick-base{
-  width:124px;
-  height:124px;
-  background:rgba(221,235,240,.14);
-  border:2px solid rgba(221,235,240,.34);
-  box-shadow:0 4px 18px rgba(0,0,0,.25);
+  width:118px;
+  height:118px;
+  background:rgba(221,235,240,.10);
+  border:2px solid rgba(221,235,240,.28);
+  box-shadow:0 4px 18px rgba(0,0,0,.20);
+  opacity:.68;
 }
 .mobile-joystick-nub{
-  width:50px;
-  height:50px;
-  margin-left:-25px;
-  margin-top:-25px;
-  left:50%;
-  top:50%;
-  background:rgba(232,240,243,.48);
-  border:2px solid rgba(255,255,255,.42);
-  transform:translate(0px,0px);
+  width:52px;
+  height:52px;
+  background:rgba(232,240,243,.44);
+  border:2px solid rgba(255,255,255,.46);
+  opacity:.80;
 }
+.mobile-joystick-zone.is-active .mobile-joystick-base,
+.mobile-joystick-zone.is-active .mobile-joystick-nub{opacity:1}
 .mobile-action{
   position:absolute;
   display:flex;
   align-items:center;
   justify-content:center;
-  width:74px;
-  height:74px;
-  border-radius:50%;
-  border:2px solid rgba(255,255,255,.35);
-  background:rgba(18,39,50,.94);
+  border:2px solid rgba(255,255,255,.32);
+  background:rgba(18,39,50,.82);
   color:#f2f6f7;
   font-weight:800;
   font-size:11px;
@@ -73,23 +71,67 @@ button,input,textarea{font:inherit}
   pointer-events:auto;
   touch-action:manipulation;
   -webkit-tap-highlight-color:transparent;
-  box-shadow:0 4px 16px rgba(0,0,0,.28);
+  box-shadow:0 4px 14px rgba(0,0,0,.23);
 }
-.mobile-action.is-pressed{transform:scale(.9);filter:brightness(1.18)}
-.mobile-attack{right:max(14px,env(safe-area-inset-right));bottom:calc(max(24px,env(safe-area-inset-bottom)) + 42px);border-color:rgba(216,180,95,.75)}
-.mobile-pull{right:106px;bottom:calc(max(24px,env(safe-area-inset-bottom)) + 122px);border-color:rgba(121,191,211,.8)}
-.mobile-dash{right:118px;bottom:calc(max(18px,env(safe-area-inset-bottom)) + 24px);border-color:rgba(178,194,202,.7)}
-.mobile-order{right:max(16px,env(safe-area-inset-right));bottom:calc(max(22px,env(safe-area-inset-bottom)) + 132px);border-color:rgba(200,154,200,.75)}
-.mobile-interact{right:max(16px,env(safe-area-inset-right));bottom:calc(max(22px,env(safe-area-inset-bottom)) + 222px);width:82px;height:82px;border-color:rgba(120,198,144,.82)}
+.mobile-action.is-pressed{transform:scale(.90);filter:brightness(1.22)}
+.mobile-attack{
+  right:max(14px,env(safe-area-inset-right));
+  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 18px);
+  width:84px;height:84px;border-radius:50%;
+  border-color:rgba(216,180,95,.78);
+}
+.mobile-dash{
+  right:112px;
+  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 22px);
+  width:68px;height:68px;border-radius:50%;
+  border-color:rgba(178,194,202,.72);
+}
+.mobile-pull{
+  right:100px;
+  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 102px);
+  width:70px;height:70px;border-radius:50%;
+  border-color:rgba(121,191,211,.82);
+}
+.mobile-order{
+  right:max(18px,env(safe-area-inset-right));
+  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 122px);
+  width:78px;height:48px;border-radius:15px;
+  border-color:rgba(200,154,200,.72);
+}
+.mobile-interact{
+  right:max(16px,env(safe-area-inset-right));
+  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 184px);
+  width:96px;height:50px;border-radius:15px;
+  border-color:rgba(120,198,144,.84);
+}
 .mobile-pause{
   right:max(12px,env(safe-area-inset-right));
   top:max(12px,env(safe-area-inset-top));
-  width:58px;
-  height:52px;
-  border-radius:16px;
-  font-size:24px;
-  border-color:rgba(168,197,206,.7);
+  width:54px;height:48px;border-radius:14px;
+  font-size:22px;
+  border-color:rgba(168,197,206,.65);
 }
+.game-toast{
+  position:fixed;
+  z-index:1800;
+  left:50%;
+  top:calc(max(8px,env(safe-area-inset-top)) + 104px);
+  width:max-content;
+  max-width:min(560px,calc(100vw - 24px));
+  padding:9px 13px;
+  border:1px solid rgba(168,197,206,.30);
+  border-radius:10px;
+  background:rgba(7,17,22,.90);
+  color:#edf4f6;
+  font-size:13px;
+  line-height:1.35;
+  text-align:center;
+  pointer-events:none;
+  opacity:0;
+  transform:translate(-50%,-6px);
+  transition:opacity .16s ease,transform .16s ease;
+}
+.game-toast.is-visible{opacity:1;transform:translate(-50%,0)}
 
 .dialogue-overlay{
   position:fixed;
@@ -174,14 +216,13 @@ button,input,textarea{font:inherit}
 }
 
 @media (max-width:430px){
-  .mobile-joystick{width:174px;height:174px}
-  .mobile-joystick-base{width:116px;height:116px}
-  .mobile-action{width:66px;height:66px;font-size:10px}
-  .mobile-interact{width:74px;height:74px}
-  .mobile-pull{right:94px;bottom:calc(max(18px,env(safe-area-inset-bottom)) + 114px)}
-  .mobile-dash{right:102px}
-  .mobile-order{bottom:calc(max(18px,env(safe-area-inset-bottom)) + 122px)}
-  .mobile-interact{bottom:calc(max(18px,env(safe-area-inset-bottom)) + 202px)}
+  .mobile-joystick-zone{width:52vw;min-width:176px;height:32vh;min-height:180px}
+  .mobile-joystick-base{width:108px;height:108px}
+  .mobile-attack{width:78px;height:78px}
+  .mobile-dash{right:102px;width:64px;height:64px}
+  .mobile-pull{right:92px;bottom:calc(max(12px,env(safe-area-inset-bottom)) + 96px);width:64px;height:64px}
+  .mobile-order{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 112px);width:74px;height:44px}
+  .mobile-interact{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 168px);width:90px;height:46px}
   .dialogue-overlay{align-items:stretch}
   .dialogue-panel{max-height:100%;height:100%;border-radius:12px}
   .dialogue-speaker{font-size:15px;padding:13px 14px 9px}
@@ -189,9 +230,20 @@ button,input,textarea{font:inherit}
   .dialogue-choices{padding:10px;gap:7px;max-height:48svh}
   .dialogue-choice{min-height:44px;font-size:12px}
 }
-
 @media (orientation:landscape) and (max-height:520px){
-  .mobile-joystick{width:150px;height:150px}
+  .mobile-joystick-zone{width:40vw;max-width:270px;height:54vh;max-height:240px}
+  .mobile-joystick-base{width:102px;height:102px}
+  .mobile-attack{width:70px;height:70px}
+  .mobile-dash{right:96px;width:60px;height:60px}
+  .mobile-pull{right:86px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 84px);width:60px;height:60px}
+  .mobile-order{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 92px);width:70px;height:40px}
+  .mobile-interact{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 142px);width:84px;height:42px}
+  .game-toast{top:84px;font-size:12px}
+  .dialogue-overlay{align-items:stretch}
+  .dialogue-panel{height:100%;max-height:100%}
+  .dialogue-choices{max-height:52svh}
+}
+
   .mobile-joystick-base{width:100px;height:100px}
   .mobile-action{width:58px;height:58px;font-size:9px}
   .mobile-attack{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 12px)}
