@@ -3,6 +3,7 @@ import { SaveManager } from '../state/SaveManager';
 import type { CaptainOrder } from '../state/types';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { equippedEffects } from '../systems/Equipment';
+import { fruitStats, recordCombatExperience, recordFruitUse } from '../systems/Progression';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
@@ -571,8 +572,8 @@ export class HarrowScene extends Phaser.Scene {
       const resistance = enemy.role === 'melee' ? 0.86 : 1;
       this.setWalkableVelocity(
         enemy.sprite,
-        n.x * save.player.fruit.force * resistance,
-        n.y * save.player.fruit.force * resistance,
+        n.x * fruit.force * resistance,
+        n.y * fruit.force * resistance,
         0.08,
       );
       enemy.alert = true;
@@ -584,11 +585,11 @@ export class HarrowScene extends Phaser.Scene {
       if (d > range) continue;
       const mass = Number(prop.getData('mass') ?? 1);
       const n = new Phaser.Math.Vector2(this.player.x - prop.x, this.player.y - prop.y).normalize();
-      prop.setVelocity(n.x * save.player.fruit.force / mass, n.y * save.player.fruit.force / mass);
+      prop.setVelocity(n.x * fruit.force / mass, n.y * fruit.force / mass);
       affected += 1;
     }
 
-    save.player.fruit.mastery = Math.min(1, save.player.fruit.mastery + Math.max(1, affected) * 0.0005);
+    recordFruitUse(save, affected);
     if (affected === 0) this.toast.show('The force catches nothing useful.');
   }
 
