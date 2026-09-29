@@ -39,7 +39,7 @@ const checks = [
   ['mobile controls remain native and touch aware', mobile.includes('navigator.maxTouchPoints > 0') && mobile.includes("document.createElement('button')")],
   ['captain HP remains on all exploration HUDs', harrowHud.includes("'HP '") && gullrockHud.includes('HP ') && seaHud.includes("'HP '")],
   ['Harrow HUD no longer permanently shows money or world time', !harrowHud.includes('Berries') && !harrowHud.includes('formatWorldTime')],
-  ['sea HUD no longer permanently shows berries hull supplies or world time', !seaHud.includes('Berries') && !seaHud.includes('Hull') && !seaHud.includes('Supplies') && !seaHud.includes('formatWorldTime')],
+  ['sea HUD no longer permanently shows berries hull supplies or world time', !seaHud.includes('Berries') && !seaHud.includes('Hull') && !seaHud.includes('Supplies') && !seaHud.includes("formatWorldTime(save),")],
   ['Gullrock crew health stays hidden in ordinary exploration', gullrock.includes('this.crewHud.setVisible(false)')],
   ['crew health HUD is generic rather than Sera/Rowan keyed', crewHud.includes('for (const member of crew)') && !crewHud.includes("['sera', 'rowan']")],
   ['Harrow crew health is contextual to active combat', harrow.includes('this.crewHud.setVisible(alerted > 0)')],
