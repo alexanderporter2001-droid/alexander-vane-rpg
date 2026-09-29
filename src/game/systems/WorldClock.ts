@@ -1,0 +1,15 @@
+import type { CampaignSave } from '../state/types';
+
+export function advanceWorldClock(save: CampaignSave, deltaSeconds: number, multiplier = 1): void {
+  save.world.minuteOfDay += (deltaSeconds / 60) * multiplier;
+  while (save.world.minuteOfDay >= 1440) {
+    save.world.minuteOfDay -= 1440;
+    save.world.day += 1;
+  }
+}
+
+export function formatWorldTime(save: CampaignSave): string {
+  const hour = Math.floor(save.world.minuteOfDay / 60) % 24;
+  const minute = Math.floor(save.world.minuteOfDay % 60);
+  return `Day ${save.world.day} · ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+}
