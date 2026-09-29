@@ -721,7 +721,7 @@ export class HarrowScene extends Phaser.Scene {
 
   private isCharacterWalkable(x: number, y: number): boolean {
     const margin = 12;
-    return [
+    const samples: Array<[number, number]> = [
       [x, y],
       [x - margin, y],
       [x + margin, y],
@@ -731,7 +731,8 @@ export class HarrowScene extends Phaser.Scene {
       [x + margin, y - margin],
       [x - margin, y + margin],
       [x + margin, y + margin],
-    ].every(([px, py]) => this.isWalkable(px, py));
+    ];
+    return samples.every(([px, py]) => this.isWalkable(px, py));
   }
 
   private drawHarbor(): void {
