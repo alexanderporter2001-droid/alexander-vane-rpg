@@ -9,6 +9,14 @@ import { MobileControls, shouldUseMobileControls } from '../systems/MobileContro
 import { Toast } from '../systems/Toast';
 import { advanceWorldClock } from '../systems/WorldClock';
 import { createEncounter, ensureKnownGroup } from '../systems/LivingWorld';
+import { crewCombatStats, fruitStats, playerCombatStats, recordCombatExperience, recordCrewExperience, recordFruitUse } from '../systems/Progression';
+
+interface BoarderUnit {
+  id: string;
+  sprite: Phaser.GameObjects.Image;
+  hp: number;
+  attackReadyAt: number;
+}
 
 interface Port {
   id: 'harrow' | 'gullrock';
@@ -87,6 +95,11 @@ export class SeaScene extends Phaser.Scene {
   private activeEncounter: WorldEncounterState | null = null;
   private encounterShip?: Phaser.GameObjects.Image;
   private encounterAttackReadyAt = 0;
+  private boardingActive = false;
+  private boarders: BoarderUnit[] = [];
+  private boardingDamageGraceUntil = 0;
+  private deckCrewAttackReady = new Map<string, number>();
+  private navigationExperienceDistance = 0;
 
   constructor() { super('SeaScene'); }
 
@@ -123,9 +136,9 @@ export class SeaScene extends Phaser.Scene {
 
     if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {
-        primary: () => undefined,
-        secondary: () => undefined,
-        dash: () => undefined,
+        primary: () => this.deckAttack(),
+        secondary: () => this.deckPull(),
+        dash: () => this.deckDash(),
         interact: () => this.contextAction(),
         order: () => this.toggleNavigationMode(),
         pause: () => this.pauseOrCloseDialogue(),
@@ -172,6 +185,30 @@ export class SeaScene extends Phaser.Scene {
       return;
     }
 
+    if (this.boardingActive) {
+      this.speed = 0;
+      this.ship.setVelocity(0, 0);
+      const combat = playerCombatStats(save);
+      save.player.stamina = Math.min(
+        save.player.maxStamina,
+        save.player.stamina + (18 + combat.staminaRecoveryBonus) * dt,
+      );
+      if (!talking) {
+        this.updateDeckMovement(dt);
+        if (Phaser.Input.Keyboard.JustDown(this.keys.attack!)) this.deckAttack();
+        if (Phaser.Input.Keyboard.JustDown(this.keys.pull!)) this.deckPull();
+        if (Phaser.Input.Keyboard.JustDown(this.keys.dash!)) this.deckDash();
+        this.updateBoardingCombat(dt);
+      }
+      this.syncDeckToShip();
+      this.updateHud();
+      if (this.time.now - this.lastSaveAt >= 20_000) {
+        SaveManager.save();
+        this.lastSaveAt = this.time.now;
+      }
+      return;
+    }
+
     if (this.navigationMode === 'sera') {
       if (!this.canSeraNavigate()) {
         this.navigationMode = 'manual';
@@ -181,6 +218,12 @@ export class SeaScene extends Phaser.Scene {
       } else {
         this.updateSeraNavigation(dt);
         if (!talking) this.updateDeckMovement(dt);
+        this.navigationExperienceDistance += Math.abs(this.speed) * dt;
+        if (this.navigationExperienceDistance >= 1500) {
+          const sera = save.crew.find((member) => member.id === 'sera');
+          if (sera) recordCrewExperience(sera, 2);
+          this.navigationExperienceDistance = 0;
+        }
       }
     } else {
       this.updateManualShip(dt);
@@ -219,6 +262,9 @@ export class SeaScene extends Phaser.Scene {
       dock: 'F',
       delegate: 'R',
       pause: Phaser.Input.Keyboard.KeyCodes.ESC,
+      attack: Phaser.Input.Keyboard.KeyCodes.SPACE,
+      pull: 'E',
+      dash: Phaser.Input.Keyboard.KeyCodes.SHIFT,
     }) as Record<string, Phaser.Input.Keyboard.Key>;
 
     this.keys.dock?.on('down', () => this.contextAction());
@@ -479,7 +525,7 @@ export class SeaScene extends Phaser.Scene {
       const column = slot % 3;
       const row = Math.floor(slot / 3);
       const x = atHelm ? 0 : -52 + column * 52;
-      const y = atHelm ? -80 : -20 + row * 48;
+      const y = atHelm ? -80 : -22 + row * 37;
       if (!atHelm) slot += 1;
 
       const sprite = this.add.image(x, y, this.crewTexture(member.id, member.visualArchetype, member.role))
@@ -796,6 +842,225 @@ export class SeaScene extends Phaser.Scene {
     this.scene.start('HarrowScene');
   }
 
+  private beginBoardingCombat(): void {
+    if (this.boardingActive || !this.activeEncounter || !this.deck) return;
+    this.boardingActive = true;
+    this.speed = 0;
+    this.ship.setVelocity(0, 0);
+    this.ship.setVisible(false);
+    this.deck.setVisible(true);
+    this.cameras.main.startFollow(this.ship, true, 0.12, 0.12);
+    this.cameras.main.setZoom(this.scale.width < 700 ? 1.58 : 1.44);
+    this.mobile?.setCombatVisible(true);
+    this.mobile?.setInteract(null);
+    this.crewHud.setVisible(true);
+
+    const count = Phaser.Math.Clamp(2 + Math.floor((this.activeEncounter.strength ?? 0.4) * 3), 2, 4);
+    this.boarders = [];
+    for (let i = 0; i < count; i += 1) {
+      const x = -48 + i * (96 / Math.max(1, count - 1));
+      const y = 118 + (i % 2) * 15;
+      const texture = this.activeEncounter.kind === 'marine' ? 'marine' : 'npc-sailor';
+      const sprite = this.add.image(x, y, texture)
+        .setScale(0.52)
+        .setDepth(11)
+        .setTint(this.activeEncounter.kind === 'pirate' ? 0x9b6554 : 0xd8e5e9);
+      this.deck.add(sprite);
+      this.boarders.push({
+        id: 'boarder-' + i,
+        sprite,
+        hp: 44 + Math.round((this.activeEncounter.strength ?? 0.4) * 24),
+        attackReadyAt: this.time.now + 700 + i * 180,
+      });
+    }
+
+    this.toast.show('BOARDING · enemies cross onto the Wayward Gull. Hold the deck.', 3600);
+    SaveManager.save();
+  }
+
+  private updateBoardingCombat(dt: number): void {
+    const save = SaveManager.get();
+    const living = this.boarders.filter((boarder) => boarder.hp > 0);
+    if (living.length === 0) {
+      this.endBoardingCombat();
+      return;
+    }
+
+    for (const boarder of living) {
+      const targets: Array<{
+        id: string;
+        x: number;
+        y: number;
+        crewId?: string;
+      }> = [{ id: 'alexander', x: this.deckPlayerLocal.x, y: this.deckPlayerLocal.y }];
+
+      for (const [crewId, view] of this.deckCrew) {
+        const state = save.crew.find((member) => member.id === crewId);
+        if (state && state.hp > 0) targets.push({ id: crewId, x: view.sprite.x, y: view.sprite.y, crewId });
+      }
+
+      const target = targets
+        .map((candidate) => ({
+          ...candidate,
+          distance: Phaser.Math.Distance.Between(boarder.sprite.x, boarder.sprite.y, candidate.x, candidate.y),
+        }))
+        .sort((a, b) => a.distance - b.distance)[0];
+      if (!target) continue;
+
+      if (target.distance > 38) {
+        const v = new Phaser.Math.Vector2(target.x - boarder.sprite.x, target.y - boarder.sprite.y).normalize();
+        const speed = 72 + (this.activeEncounter?.strength ?? 0.4) * 36;
+        boarder.sprite.x = Phaser.Math.Clamp(boarder.sprite.x + v.x * speed * dt, -82, 82);
+        boarder.sprite.y = Phaser.Math.Clamp(boarder.sprite.y + v.y * speed * dt, -138, 138);
+      } else if (this.time.now >= boarder.attackReadyAt) {
+        boarder.attackReadyAt = this.time.now + 1150;
+        const damage = 5 + Math.round((this.activeEncounter?.strength ?? 0.4) * 4);
+        if (target.id === 'alexander') {
+          if (this.time.now >= this.boardingDamageGraceUntil) {
+            this.boardingDamageGraceUntil = this.time.now + 380;
+            const reduction = equippedEffects(save.player.equipment).damageReduction;
+            save.player.hp = Math.max(0, save.player.hp - Math.max(1, damage - reduction));
+            this.cameras.main.shake(70, 0.003);
+            if (save.player.hp <= 0) {
+              save.world.flags.alexanderDead = true;
+              SaveManager.save();
+              this.scene.start('GameOverScene');
+              return;
+            }
+          }
+        } else if (target.crewId) {
+          const state = save.crew.find((member) => member.id === target.crewId);
+          const view = this.deckCrew.get(target.crewId);
+          if (state && view) {
+            const reduction = equippedEffects(state.equipment).damageReduction;
+            state.hp = Math.max(0, state.hp - Math.max(1, damage - reduction));
+            const away = new Phaser.Math.Vector2(view.sprite.x - boarder.sprite.x, view.sprite.y - boarder.sprite.y).normalize();
+            view.sprite.x += away.x * 7;
+            view.sprite.y += away.y * 7;
+            view.x = view.sprite.x;
+            view.y = view.sprite.y;
+            if (state.hp <= 0) {
+              view.sprite.setTint(0x555b5f).setAlpha(0.7).setAngle(90);
+              view.label.setText((state.name.split(' ')[0] ?? state.name) + ' · DOWN').setColor('#ffd3ca');
+            } else if (Math.abs(view.sprite.x) > 86 || Math.abs(view.sprite.y) > 146) {
+              state.hp = 0;
+              save.world.flags['overboard-' + state.id] = true;
+              view.sprite.setVisible(false);
+              view.label.setText((state.name.split(' ')[0] ?? state.name) + ' · OVERBOARD').setColor('#ffd3ca');
+              this.toast.show(state.name + ' is knocked overboard!', 3000);
+            }
+          }
+        }
+      }
+    }
+
+    for (const [crewId, view] of this.deckCrew) {
+      const member = save.crew.find((candidate) => candidate.id === crewId);
+      if (!member || member.hp <= 0) continue;
+      const target = living
+        .map((boarder) => ({
+          boarder,
+          distance: Phaser.Math.Distance.Between(view.sprite.x, view.sprite.y, boarder.sprite.x, boarder.sprite.y),
+        }))
+        .sort((a, b) => a.distance - b.distance)[0];
+      if (!target || target.distance > 74) continue;
+
+      const ready = this.deckCrewAttackReady.get(crewId) ?? 0;
+      if (this.time.now < ready) continue;
+      const stats = crewCombatStats(member);
+      this.deckCrewAttackReady.set(crewId, this.time.now + 900 * stats.cooldownMultiplier);
+      target.boarder.hp -= 12 + stats.damageBonus + equippedEffects(member.equipment).meleeDamageBonus;
+      recordCrewExperience(member, 2);
+      target.boarder.sprite.setTintFill(0xffffff);
+      this.time.delayedCall(70, () => {
+        if (target.boarder.hp > 0) target.boarder.sprite.clearTint();
+      });
+      if (target.boarder.hp <= 0) {
+        target.boarder.sprite.setTint(0x555b5f).setAlpha(0.65).setAngle(90);
+      }
+    }
+
+    this.crewHud.update(save.crew.map((member) => ({
+      id: member.id,
+      name: member.name,
+      hp: member.hp,
+      maxHp: member.maxHp,
+    })));
+  }
+
+  private deckAttack(): void {
+    if (!this.boardingActive) return;
+    const living = this.boarders
+      .filter((boarder) => boarder.hp > 0)
+      .map((boarder) => ({
+        boarder,
+        distance: Phaser.Math.Distance.Between(this.deckPlayerLocal.x, this.deckPlayerLocal.y, boarder.sprite.x, boarder.sprite.y),
+      }))
+      .filter((entry) => entry.distance <= 72)
+      .sort((a, b) => a.distance - b.distance);
+    const target = living[0];
+    if (!target) return;
+
+    const save = SaveManager.get();
+    const combat = playerCombatStats(save);
+    target.boarder.hp -= 24 + combat.meleeDamageBonus + equippedEffects(save.player.equipment).meleeDamageBonus;
+    recordCombatExperience(save, 2);
+    target.boarder.sprite.setTintFill(0xffffff);
+    this.time.delayedCall(70, () => {
+      if (target.boarder.hp > 0) target.boarder.sprite.clearTint();
+    });
+    if (target.boarder.hp <= 0) {
+      target.boarder.sprite.setTint(0x555b5f).setAlpha(0.65).setAngle(90);
+    }
+  }
+
+  private deckPull(): void {
+    if (!this.boardingActive) return;
+    const save = SaveManager.get();
+    const stats = fruitStats(save);
+    if (save.player.stamina < stats.staminaCost) return;
+    save.player.stamina -= stats.staminaCost;
+    let affected = 0;
+
+    for (const boarder of this.boarders) {
+      if (boarder.hp <= 0) continue;
+      const distance = Phaser.Math.Distance.Between(this.deckPlayerLocal.x, this.deckPlayerLocal.y, boarder.sprite.x, boarder.sprite.y);
+      if (distance > stats.range * 0.42) continue;
+      const toward = new Phaser.Math.Vector2(this.deckPlayerLocal.x - boarder.sprite.x, this.deckPlayerLocal.y - boarder.sprite.y).normalize();
+      const displacement = Math.min(54, stats.force * 0.08);
+      boarder.sprite.x = Phaser.Math.Clamp(boarder.sprite.x + toward.x * displacement, -84, 84);
+      boarder.sprite.y = Phaser.Math.Clamp(boarder.sprite.y + toward.y * displacement, -142, 142);
+      affected += 1;
+    }
+    recordFruitUse(save, affected);
+  }
+
+  private deckDash(): void {
+    if (!this.boardingActive) return;
+    const save = SaveManager.get();
+    const combat = playerCombatStats(save);
+    if (save.player.stamina < combat.dashCost) return;
+    const move = this.getMoveInput();
+    if (move.lengthSq() < 0.04) return;
+    save.player.stamina -= combat.dashCost;
+    move.normalize().scale(48);
+    this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x + move.x, -68, 68);
+    this.deckPlayerLocal.y = Phaser.Math.Clamp(this.deckPlayerLocal.y + move.y, -92, 108);
+  }
+
+  private endBoardingCombat(): void {
+    this.boardingActive = false;
+    for (const boarder of this.boarders) boarder.sprite.destroy();
+    this.boarders = [];
+    this.deckCrewAttackReady.clear();
+    this.mobile?.setCombatVisible(false);
+    this.crewHud.setVisible(false);
+    this.finishSeaEncounter(-0.35, 'The boarding party is driven off. The enemy ship breaks away.');
+    this.speed = 24;
+    this.applyNavigationPresentation(false);
+    SaveManager.save();
+  }
+
   private encounterDistance(): number {
     if (!this.encounterShip) return Number.POSITIVE_INFINITY;
     return Phaser.Math.Distance.Between(this.ship.x, this.ship.y, this.encounterShip.x, this.encounterShip.y);
@@ -860,6 +1125,11 @@ export class SeaScene extends Phaser.Scene {
       const chaseSpeed = 88 + (encounter.strength ?? 0.4) * 62;
       other.x += toward.x * chaseSpeed * dt;
       other.y += toward.y * chaseSpeed * dt;
+
+      if (encounter.intent === 'board' && distance <= 95) {
+        this.beginBoardingCombat();
+        return;
+      }
 
       if (distance <= 240 && this.time.now >= this.encounterAttackReadyAt) {
         this.encounterAttackReadyAt = this.time.now + 2300;
