@@ -3,7 +3,6 @@ import { SaveManager } from '../state/SaveManager';
 import type { CaptainOrder } from '../state/types';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { equippedEffects } from '../systems/Equipment';
-import { awardCombatProgress, fruitStats } from '../systems/LivingWorld';
 import { fruitStats, recordCombatExperience, recordFruitUse } from '../systems/Progression';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
@@ -515,7 +514,7 @@ export class HarrowScene extends Phaser.Scene {
       enemy.alert = true;
       const gearBonus = equippedEffects(SaveManager.get().player.equipment).meleeDamageBonus;
       enemy.hp -= 26 + gearBonus;
-      awardCombatProgress(SaveManager.get(), 2);
+      recordCombatExperience(SaveManager.get(), 2);
       this.hitFlash(enemy.sprite);
       if (enemy.hp <= 0) this.downEnemy(enemy);
     }
