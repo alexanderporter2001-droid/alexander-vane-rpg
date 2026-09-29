@@ -23,6 +23,7 @@ The current vertical slice is built as a complete local loop rather than disconn
 13. Gullrock has persistent dialogue choices, paid services, ship repair, crew meals, local information, and world-time consequences.
 14. Mobile controls are native browser controls layered above the game canvas, with iPhone safe-area support and independent pointer handling. Harrow AI respects shoreline boundaries; Sera and Rowan are labeled in-world.
 15. Dialogue is a native responsive overlay with scrollable text and choices so small phone screens cannot hide conversation content behind the HUD.
+16. Mobile movement now uses a floating joystick that centers under the thumb, combat buttons are spaced for portrait play, melee keeps facing/assists nearby targets, transient messages sit below the HUD, and defeated characters visibly fall with DOWN markers.
 16. Status messages no longer overlap the HUD; touch combat has hold-to-attack, last-facing memory, nearby-enemy aim assistance, a simplified right-thumb layout, and obvious DOWN states for defeated characters.
 
 The old fake freeform-intent control is intentionally absent. It returns only when typed intent can resolve into real dialogue, orders, or world actions.
