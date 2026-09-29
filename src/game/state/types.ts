@@ -1,7 +1,15 @@
 export type SceneId = 'opening' | 'harrow' | 'sea' | 'gullrock';
 export type CaptainOrder = 'regroup' | 'aggressive' | 'defensive' | 'protect-sera' | 'retreat';
+export type EquipmentSlot = 'weapon' | 'armor' | 'tool' | 'accessory';
 
 export interface Vec2 { x: number; y: number }
+
+export interface EquipmentLoadout {
+  weapon: string | null;
+  armor: string | null;
+  tool: string | null;
+  accessory: string | null;
+}
 
 export interface PlayerState {
   name: 'Alexander Vane';
@@ -13,6 +21,8 @@ export interface PlayerState {
   berries: number;
   bounty: number;
   position: Vec2;
+  equipmentTags: string[];
+  equipment: EquipmentLoadout;
   fruit: {
     eaten: true;
     fruitNameKnown: boolean;
@@ -25,7 +35,7 @@ export interface PlayerState {
 }
 
 export interface CrewState {
-  id: 'sera' | 'rowan';
+  id: string;
   name: string;
   role: string;
   hp: number;
@@ -34,6 +44,9 @@ export interface CrewState {
   loyalty: number;
   morale: number;
   notes: string[];
+  equipmentTags: string[];
+  capabilities: string[];
+  equipment: EquipmentLoadout;
 }
 
 export interface ShipState {
@@ -55,13 +68,14 @@ export interface JournalEntry {
 }
 
 export interface CampaignSave {
-  saveVersion: 3;
+  saveVersion: 4;
   gameVersion: string;
   updatedAt: string;
   player: PlayerState;
   crew: CrewState[];
   ship: ShipState;
   inventory: Record<string, number>;
+  equipmentInventory: Record<string, number>;
   journal: JournalEntry[];
   world: {
     scene: SceneId;
