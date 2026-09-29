@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
 import type { CaptainOrder } from '../state/types';
+import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
@@ -44,6 +45,7 @@ export class HarrowScene extends Phaser.Scene {
   private toast!: Toast;
   private hud!: Phaser.GameObjects.Text;
   private status!: Phaser.GameObjects.Text;
+  private crewHud!: CrewStatusHud;
 
   private order: CaptainOrder = 'regroup';
   private lastFacing = new Phaser.Math.Vector2(1, 0);
@@ -160,6 +162,7 @@ export class HarrowScene extends Phaser.Scene {
     this.createInput();
     this.toast = new Toast(this);
     this.createHud();
+    this.crewHud = new CrewStatusHud(this, 14, 84);
 
     if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {
@@ -280,6 +283,15 @@ export class HarrowScene extends Phaser.Scene {
         ]);
     const alerted = this.enemies.filter((e) => e.alert && e.hp > 0).length;
     this.status.setText(`Harrow Docks\n${formatWorldTime(save)}${alerted ? `\n${alerted} alerted` : ''}`);
+    this.crewHud.update(this.crew.map((unit) => {
+      const state = save.crew.find((member) => member.id === unit.id);
+      return {
+        id: unit.id,
+        name: state?.name ?? (unit.id === 'sera' ? 'Sera Quill' : 'Rowan Vale'),
+        hp: unit.hp,
+        maxHp: state?.maxHp ?? unit.hp,
+      };
+    }));
   }
 
   private getMove(): Phaser.Math.Vector2 {
@@ -629,6 +641,8 @@ export class HarrowScene extends Phaser.Scene {
     const save = SaveManager.get();
     this.persist();
     save.world.flags.harrowEscaped = true;
+    save.world.flags.shipDestination = 'gullrock';
+    save.world.flags.sailingDelegated = true;
     save.world.scene = 'sea';
     save.world.locationId = 'east-blue-open-sea';
     save.ship.x = 760;
