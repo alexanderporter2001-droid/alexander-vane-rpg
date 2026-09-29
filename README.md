@@ -4,7 +4,7 @@ A private, persistent, consequence-driven pirate RPG built around Alexander Vane
 
 This repository replaces the Floot prototype as the permanent source of truth. Hosting is replaceable; campaign continuity and versioned saves are not.
 
-## Current foundation — v0.3.13
+## Current foundation — v0.3.14
 
 The current vertical slice is built as a complete local loop rather than disconnected demos:
 
@@ -52,6 +52,16 @@ The current vertical slice is built as a complete local loop rather than disconn
 44. Nico offers a zero-AI paid dock-loading shift. The player physically walks between three visible cargo markers and earns 2,400 berries on completion; the work can be repeated on a later in-world day.
 45. Crew AI quality is no longer keyed only to Sera and Rowan. Any future saved crew identity enters the same economy-first Luna / complex-conversation Sol routing, persistent memory, and relationship-impression pipeline.
 46. Save schema v4 adds equipment and extensible crew capability fields with an explicit v3→v4 migration so existing campaigns remain usable.
+47. Save schema v5 adds persistent island, encounter, known-group, recruit-candidate, threat-heat, player progression, and crew progression state while preserving v3/v4 campaigns.
+48. Pull mastery now has gameplay effects: increasing mastery improves effective pull range/force, reduces stamina cost, and can unlock techniques instead of being a display-only percentage.
+49. Early Harrow combat has a short damage-overlap grace window and lower Marine burst damage so permadeath remains dangerous without deleting a campaign from stacked hits before the player can react.
+50. Passive crew-health overlays are removed from ordinary Gullrock/sea exploration and become contextual during active Harrow combat; full crew status remains in the Captain's Journal.
+51. Opening the Captain's Journal now gives it exclusive screen control and hides gameplay controls, crew HUD, and dialogue overlays until play resumes.
+52. Procedural crew sprites have stronger silhouette differences for navigator/fighter roles without replacing the lightweight art pipeline.
+53. Deterministic living-world foundations can create and persist islands, simulate them forward by world day, and create location-aware Marine/pirate/merchant/bounty-hunter encounters without AI calls.
+54. Encounter ranks are rarity-weighted; Admiral/canon-equivalent figures are explicitly excluded from random generation and are reserved for authored canon presence or consequential world responses.
+55. Recruitment foundations support persistent candidates, trust/availability gates, a 15-member deep-simulation cap, and promotion into the same generic crew state/equipment/progression pipeline used by existing crew.
+56. AI remains primarily a dialogue/character layer; world generation, progression, encounter selection, recruitment rules, and simulation are deterministic code.
 
 Typed freeform dialogue now has a live AI path with structured output, relevance-selected context, prioritized persistent memories, private relationship impressions, economy-first model routing, zero-cost handling for obvious routine ship orders, and a local offline fallback. Economy and equipment remain normal deterministic game systems with zero API cost. AI responses may propose only explicitly supported game actions; the simulation validates and applies them.
 
