@@ -106,7 +106,16 @@ function normalizeCurrent(raw: Record<string, any>): CampaignSave {
   fresh.world = {
     ...fresh.world,
     ...oldWorld,
-    flags: isObject(oldWorld.flags) ? { ...fresh.world.flags, ...oldWorld.flags } : fresh.world.flags,
+    flags: isObject(oldWorld.flags)
+      ? {
+          ...fresh.world.flags,
+          ...Object.fromEntries(
+            Object.entries(oldWorld.flags).filter(([, value]) =>
+              typeof value === 'boolean' || typeof value === 'string' || typeof value === 'number'
+            ),
+          ),
+        }
+      : fresh.world.flags,
     canonLedger: Array.isArray(oldWorld.canonLedger) ? oldWorld.canonLedger : fresh.world.canonLedger,
   };
 
