@@ -133,7 +133,7 @@ button,input,textarea{font:inherit}
 .game-toast{
   position:fixed;
   left:50%;
-  top:max(108px,calc(env(safe-area-inset-top) + 96px));
+  top:max(184px,calc(env(safe-area-inset-top) + 172px));
   z-index:1500;
   width:min(520px,calc(100vw - 24px));
   transform:translate(-50%,-8px);
@@ -258,7 +258,7 @@ button,input,textarea{font:inherit}
     width:90px;
   }
   .game-toast{
-    top:max(102px,calc(env(safe-area-inset-top) + 90px));
+    top:max(176px,calc(env(safe-area-inset-top) + 164px));
     width:calc(100vw - 18px);
     font-size:12px;
     padding:8px 10px;
@@ -301,7 +301,7 @@ button,input,textarea{font:inherit}
     height:40px;
   }
   .game-toast{
-    top:max(80px,calc(env(safe-area-inset-top) + 68px));
+    top:max(142px,calc(env(safe-area-inset-top) + 130px));
     width:min(480px,calc(100vw - 190px));
     font-size:11px;
   }
