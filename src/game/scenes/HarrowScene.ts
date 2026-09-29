@@ -176,7 +176,11 @@ export class HarrowScene extends Phaser.Scene {
       this.mobile.setOrderLabel('REGROUP');
     }
 
-    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+    this.cameras.main.setDeadzone(
+      Math.min(280, this.scale.width * 0.38),
+      Math.min(220, this.scale.height * 0.28),
+    );
     this.cameras.main.setZoom(this.scale.width < 700 ? 1.04 : 1);
 
     if (save.world.flags.alexanderDead) {
