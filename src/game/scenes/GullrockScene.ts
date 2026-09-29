@@ -8,7 +8,7 @@ import { EQUIPMENT, GULLROCK_GEAR_STOCK, isCompatible } from '../systems/Equipme
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
-import { advanceWorldClock, advanceWorldMinutes, formatWorldTime } from '../systems/WorldClock';
+import { advanceWorldClock, advanceWorldMinutes } from '../systems/WorldClock';
 
 export class GullrockScene extends Phaser.Scene {
   private readonly worldW = 1500;
