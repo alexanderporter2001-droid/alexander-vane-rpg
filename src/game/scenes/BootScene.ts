@@ -1,16 +1,11 @@
 import Phaser from 'phaser';
-import { SaveManager } from '../state/SaveManager';
 
 export class BootScene extends Phaser.Scene {
   constructor() { super('BootScene'); }
 
   create(): void {
     this.makeTextures();
-    const save = SaveManager.load();
-    if (!save.world.flags.openingSeen || save.world.scene === 'opening') this.scene.start('OpeningScene');
-    else if (save.world.scene === 'sea') this.scene.start('SeaScene');
-    else if (save.world.scene === 'gullrock') this.scene.start('GullrockScene');
-    else this.scene.start('HarrowScene');
+    this.scene.start('TitleScene');
   }
 
   private makeTextures(): void {

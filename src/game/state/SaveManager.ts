@@ -26,7 +26,7 @@ function migrate(raw: unknown): CampaignSave {
   if (typeof oldPlayer.money === 'number') fresh.player.berries = oldPlayer.money;
   if (typeof oldPlayer.berries === 'number') fresh.player.berries = oldPlayer.berries;
   if (typeof oldPlayer.bounty === 'number') fresh.player.bounty = oldPlayer.bounty;
-  if (typeof oldPlayer.hp === 'number') fresh.player.hp = Math.max(1, oldPlayer.hp);
+  if (typeof oldPlayer.hp === 'number') fresh.player.hp = Math.max(0, oldPlayer.hp);
 
   if (isObject(oldPlayer.fruit)) {
     const f = oldPlayer.fruit as Record<string, any>;
@@ -53,6 +53,10 @@ function migrate(raw: unknown): CampaignSave {
 export class SaveManager {
   private static state: CampaignSave | null = null;
 
+  static hasStoredSave(): boolean {
+    return localStorage.getItem(KEY) !== null;
+  }
+
   static get(): CampaignSave {
     if (!this.state) this.state = this.load();
     return this.state;
@@ -68,6 +72,12 @@ export class SaveManager {
     return this.state;
   }
 
+  static startNew(): CampaignSave {
+    this.state = createDefaultCampaign();
+    this.save();
+    return this.state;
+  }
+
   static save(): void {
     const state = this.get();
     state.updatedAt = new Date().toISOString();
@@ -75,8 +85,7 @@ export class SaveManager {
   }
 
   static reset(): void {
-    this.state = createDefaultCampaign();
-    this.save();
+    this.startNew();
   }
 
   static exportText(): string {
