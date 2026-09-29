@@ -3,11 +3,11 @@ import { SaveManager } from '../state/SaveManager';
 import type { CaptainOrder } from '../state/types';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { equippedEffects } from '../systems/Equipment';
-import { fruitStats, recordCombatExperience, recordFruitUse } from '../systems/Progression';
+import { crewCombatStats, fruitStats, playerCombatStats, recordCombatExperience, recordCrewExperience, recordFruitUse } from '../systems/Progression';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
-import { advanceWorldClock, formatWorldTime } from '../systems/WorldClock';
+import { advanceWorldClock } from '../systems/WorldClock';
 
 type EnemyRole = 'melee' | 'rifle';
 
@@ -25,7 +25,7 @@ interface EnemyUnit {
 }
 
 interface CrewUnit {
-  id: 'sera' | 'rowan';
+  id: string;
   sprite: Phaser.Physics.Arcade.Sprite;
   label?: Phaser.GameObjects.Text;
   hp: number;
@@ -59,6 +59,7 @@ export class HarrowScene extends Phaser.Scene {
   private dead = false;
   private lastSaveAt = 0;
   private damageGraceUntil = 0;
+  private hitStunUntil = 0;
 
   constructor() { super('HarrowScene'); }
 
@@ -77,30 +78,33 @@ export class HarrowScene extends Phaser.Scene {
     this.player.setBodySize(34, 28).setOffset(19, 72);
     this.lastValid.set(this.player.x, this.player.y);
 
-    const seraState = save.crew.find((c) => c.id === 'sera');
-    const rowanState = save.crew.find((c) => c.id === 'rowan');
-    this.crew = [
-      {
-        id: 'sera',
-        sprite: this.physics.add.sprite(seraState?.position.x ?? 650, seraState?.position.y ?? 905, 'sera').setDepth(48),
-        hp: seraState?.hp ?? 76,
+    this.crew = save.crew.map((member, index) => {
+      const angle = (index / Math.max(1, save.crew.length)) * Math.PI * 2;
+      const fallbackX = this.player.x + Math.cos(angle) * (70 + (index % 2) * 22);
+      const fallbackY = this.player.y + Math.sin(angle) * (55 + (index % 2) * 18);
+      const useSaved = this.isCharacterWalkable(member.position.x, member.position.y);
+      const texture = this.crewTexture(member.id, member.visualArchetype, member.role);
+      return {
+        id: member.id,
+        sprite: this.physics.add.sprite(
+          useSaved ? member.position.x : fallbackX,
+          useSaved ? member.position.y : fallbackY,
+          texture,
+        ).setDepth(48 + Math.min(index, 8)),
+        hp: member.hp,
         attackReadyAt: 0,
-      },
-      {
-        id: 'rowan',
-        sprite: this.physics.add.sprite(rowanState?.position.x ?? 780, rowanState?.position.y ?? 900, 'rowan').setDepth(49),
-        hp: rowanState?.hp ?? 110,
-        attackReadyAt: 0,
-      },
-    ];
+      };
+    });
     for (const unit of this.crew) {
       unit.sprite.setBodySize(32, 28).setOffset(20, 72).setCollideWorldBounds(true);
-      const title = unit.id === 'sera' ? 'SERA QUILL · Navigator' : 'ROWAN VALE · Fighter';
+      const state = save.crew.find((member) => member.id === unit.id);
+      const title = state ? state.name.toUpperCase() + ' · ' + state.role : unit.id.toUpperCase();
+      const color = state?.capabilities.includes('navigation') ? '#d6edf6' : '#f0d9cb';
       unit.label = this.add.text(unit.sprite.x, unit.sprite.y - 58, title, {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '11px',
         fontStyle: 'bold',
-        color: unit.id === 'sera' ? '#d6edf6' : '#f0d9cb',
+        color,
         backgroundColor: '#071116c9',
         padding: { x: 5, y: 3 },
       }).setOrigin(0.5, 1).setDepth(84);
@@ -139,7 +143,7 @@ export class HarrowScene extends Phaser.Scene {
       const bullet = raw as Phaser.Physics.Arcade.Image;
       if (!bullet.active) return;
       bullet.disableBody(true, true);
-      this.damagePlayer(9);
+      this.damagePlayer(8);
     });
     for (const unit of this.crew) {
       this.physics.add.overlap(unit.sprite, this.bullets, (_p, raw) => {
@@ -281,27 +285,23 @@ export class HarrowScene extends Phaser.Scene {
     const save = SaveManager.get();
     this.hud.setText(this.mobile
       ? [
-          `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp} · STM ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
-          `Pull familiarity ${Math.round(save.player.fruit.mastery * 100)}%`,
-          `Berries ${save.player.berries.toLocaleString()}`,
+          'HP ' + Math.ceil(save.player.hp) + '/' + save.player.maxHp + ' · STM ' + Math.ceil(save.player.stamina) + '/' + save.player.maxStamina,
         ]
       : [
-          `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp}`,
-          `Stamina ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
-          `Pull familiarity ${Math.round(save.player.fruit.mastery * 100)}%`,
-          `Berries ${save.player.berries.toLocaleString()}`,
-          `Order: ${this.order.replace('-', ' ')}`,
+          'HP ' + Math.ceil(save.player.hp) + '/' + save.player.maxHp,
+          'Stamina ' + Math.ceil(save.player.stamina) + '/' + save.player.maxStamina,
+          'Order: ' + this.order.replace('-', ' '),
         ]);
-    const alerted = this.enemies.filter((e) => e.alert && e.hp > 0).length;
-    this.status.setText(`Harrow Docks\n${formatWorldTime(save)}${alerted ? `\n${alerted} alerted` : ''}`);
+    const alerted = this.enemies.filter((enemy) => enemy.alert && enemy.hp > 0).length;
+    this.status.setText(alerted ? 'Harrow Docks\n' + alerted + ' alerted' : 'Harrow Docks');
     this.crewHud.setVisible(alerted > 0);
     this.crewHud.update(this.crew.map((unit) => {
       const state = save.crew.find((member) => member.id === unit.id);
       return {
         id: unit.id,
-        name: state?.name ?? (unit.id === 'sera' ? 'Sera Quill' : 'Rowan Vale'),
+        name: state?.name ?? unit.id,
         hp: unit.hp,
-        maxHp: state?.maxHp ?? unit.hp,
+        maxHp: state?.maxHp ?? Math.max(1, unit.hp),
       };
     }));
   }
@@ -322,12 +322,18 @@ export class HarrowScene extends Phaser.Scene {
 
   private updatePlayer(dt: number): void {
     const save = SaveManager.get();
-    save.player.stamina = Math.min(save.player.maxStamina, save.player.stamina + 22 * dt);
+    const combat = playerCombatStats(save);
+    save.player.stamina = Math.min(
+      save.player.maxStamina,
+      save.player.stamina + (22 + combat.staminaRecoveryBonus) * dt,
+    );
 
     if (this.time.now >= this.dashUntil) {
       const v = this.getMove();
       if (v.lengthSq() > 0.01) this.lastFacing.copy(v).normalize();
-      this.player.setVelocity(v.x * 210, v.y * 210);
+      const hitRecovery = this.time.now < this.hitStunUntil ? 0.58 : 1;
+      const speed = 210 * combat.moveSpeedMultiplier * hitRecovery;
+      this.player.setVelocity(v.x * speed, v.y * speed);
     }
 
     if (this.isWalkable(this.player.x, this.player.y)) {
@@ -386,7 +392,7 @@ export class HarrowScene extends Phaser.Scene {
   }
 
   private meleeWindup(enemy: EnemyUnit): void {
-    enemy.attackReadyAt = this.time.now + 980;
+    enemy.attackReadyAt = this.time.now + 1120;
     const arc = this.add.circle(enemy.sprite.x, enemy.sprite.y, 42, 0xff8f76, 0.08)
       .setStrokeStyle(3, 0xff8f76, 0.8)
       .setDepth(70);
@@ -397,12 +403,12 @@ export class HarrowScene extends Phaser.Scene {
       arc.destroy();
       if (enemy.hp <= 0 || this.dead) return;
       const d = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, this.player.x, this.player.y);
-      if (d <= 62 && this.time.now >= this.dashUntil) this.damagePlayer(11);
+      if (d <= 62 && this.time.now >= this.dashUntil) this.damagePlayer(10);
     });
   }
 
   private rifleWindup(enemy: EnemyUnit): void {
-    enemy.attackReadyAt = this.time.now + 1450;
+    enemy.attackReadyAt = this.time.now + 1750;
     const line = this.add.line(
       0,
       0,
@@ -437,54 +443,77 @@ export class HarrowScene extends Phaser.Scene {
   }
 
   private updateCrew(_dt: number): void {
-    const rowan = this.crew.find((c) => c.id === 'rowan');
-    const sera = this.crew.find((c) => c.id === 'sera');
-    if (!rowan || !sera) return;
+    const save = SaveManager.get();
+    const living = this.enemies.filter((enemy) => enemy.alert && enemy.hp > 0);
 
-    if (sera.hp > 0) {
-      const seraTargetX = this.order === 'retreat' ? this.player.x - 80 : this.player.x - 70;
-      const seraTargetY = this.order === 'retreat' ? this.player.y + 55 : this.player.y + 70;
-      if (Phaser.Math.Distance.Between(sera.sprite.x, sera.sprite.y, seraTargetX, seraTargetY) > 55) {
-        this.moveToward(sera.sprite, seraTargetX, seraTargetY, 150);
-      } else sera.sprite.setVelocity(0, 0);
-    }
+    this.crew.forEach((unit, index) => {
+      const state = save.crew.find((member) => member.id === unit.id);
+      if (!state || unit.hp <= 0) return;
 
-    if (rowan.hp <= 0) return;
-    const living = this.enemies.filter((e) => e.alert && e.hp > 0);
-    const target = living
-      .map((enemy) => ({
-        enemy,
-        d: Phaser.Math.Distance.Between(rowan.sprite.x, rowan.sprite.y, enemy.sprite.x, enemy.sprite.y),
-      }))
-      .sort((a, b) => a.d - b.d)[0];
+      const combat = crewCombatStats(state);
+      const supportRole = state.capabilities.includes('navigation')
+        || state.capabilities.includes('medicine')
+        || state.capabilities.includes('triage');
 
-    const shouldEngage = target && (
-      this.order === 'aggressive' ||
-      this.order === 'protect-sera' ||
-      target.d < 150
-    ) && this.order !== 'retreat';
+      const target = living
+        .map((enemy) => ({
+          enemy,
+          distance: Phaser.Math.Distance.Between(unit.sprite.x, unit.sprite.y, enemy.sprite.x, enemy.sprite.y),
+        }))
+        .sort((a, b) => a.distance - b.distance)[0];
 
-    if (shouldEngage && target) {
-      if (target.d > 58) {
-        this.moveToward(rowan.sprite, target.enemy.sprite.x, target.enemy.sprite.y, this.order === 'aggressive' ? 190 : 165);
-      } else {
-        rowan.sprite.setVelocity(0, 0);
-        if (this.time.now >= rowan.attackReadyAt) {
-          rowan.attackReadyAt = this.time.now + 720;
-          const rowanState = SaveManager.get().crew.find((member) => member.id === 'rowan');
-          const gearBonus = rowanState ? equippedEffects(rowanState.equipment).meleeDamageBonus : 0;
-          target.enemy.hp -= 22 + gearBonus;
-          this.hitFlash(target.enemy.sprite);
-          if (target.enemy.hp <= 0) this.downEnemy(target.enemy);
+      const shouldEngage = Boolean(
+        target
+        && this.order !== 'retreat'
+        && !supportRole
+        && (
+          this.order === 'aggressive'
+          || this.order === 'protect-sera'
+          || target.distance < 145
+        ),
+      );
+
+      if (shouldEngage && target) {
+        if (target.distance > 58) {
+          const baseSpeed = this.order === 'aggressive' ? 188 : 162;
+          this.moveToward(
+            unit.sprite,
+            target.enemy.sprite.x,
+            target.enemy.sprite.y,
+            baseSpeed * combat.moveSpeedMultiplier,
+          );
+        } else {
+          unit.sprite.setVelocity(0, 0);
+          if (this.time.now >= unit.attackReadyAt) {
+            unit.attackReadyAt = this.time.now + 780 * combat.cooldownMultiplier;
+            const gearBonus = equippedEffects(state.equipment).meleeDamageBonus;
+            const roleDamage = state.capabilities.includes('frontline-combat') ? 22 : 15;
+            target.enemy.hp -= roleDamage + combat.damageBonus + gearBonus;
+            recordCrewExperience(state, 2);
+            this.hitFlash(target.enemy.sprite);
+            if (target.enemy.hp <= 0) this.downEnemy(target.enemy);
+          }
         }
+        return;
       }
-    } else {
-      const offsetX = this.order === 'defensive' ? -35 : 50;
-      const offsetY = this.order === 'defensive' ? 25 : 60;
-      if (Phaser.Math.Distance.Between(rowan.sprite.x, rowan.sprite.y, this.player.x + offsetX, this.player.y + offsetY) > 70) {
-        this.moveToward(rowan.sprite, this.player.x + offsetX, this.player.y + offsetY, 165);
-      } else rowan.sprite.setVelocity(0, 0);
-    }
+
+      const formation = this.formationOffset(index, supportRole);
+      const targetX = this.player.x + formation.x;
+      const targetY = this.player.y + formation.y;
+      const distance = Phaser.Math.Distance.Between(unit.sprite.x, unit.sprite.y, targetX, targetY);
+      if (distance > 58) {
+        this.moveToward(unit.sprite, targetX, targetY, 145 * combat.moveSpeedMultiplier);
+      } else {
+        unit.sprite.setVelocity(0, 0);
+      }
+    });
+  }
+
+  private formationOffset(index: number, supportRole: boolean): Phaser.Math.Vector2 {
+    if (this.order === 'retreat') return new Phaser.Math.Vector2(-85 - index * 18, 70 + (index % 3) * 26);
+    if (supportRole) return new Phaser.Math.Vector2(-70 - (index % 2) * 24, 62 + (index % 3) * 24);
+    if (this.order === 'defensive') return new Phaser.Math.Vector2(-20 + (index % 3) * 34, 52 + Math.floor(index / 3) * 30);
+    return new Phaser.Math.Vector2(48 + (index % 3) * 34, 48 + Math.floor(index / 3) * 30);
   }
 
   private attack(): void {
@@ -512,8 +541,10 @@ export class HarrowScene extends Phaser.Scene {
       if (to.length() > (this.mobile ? 86 : 80)) continue;
       if (to.clone().normalize().dot(facing) < -0.08) continue;
       enemy.alert = true;
-      const gearBonus = equippedEffects(SaveManager.get().player.equipment).meleeDamageBonus;
-      enemy.hp -= 26 + gearBonus;
+      const current = SaveManager.get();
+      const gearBonus = equippedEffects(current.player.equipment).meleeDamageBonus;
+      const combatBonus = playerCombatStats(current).meleeDamageBonus;
+      enemy.hp -= 26 + gearBonus + combatBonus;
       recordCombatExperience(SaveManager.get(), 2);
       this.hitFlash(enemy.sprite);
       if (enemy.hp <= 0) this.downEnemy(enemy);
@@ -558,7 +589,7 @@ export class HarrowScene extends Phaser.Scene {
     const fruit = fruitStats(save);
     if (this.dead || this.time.now < this.pullReadyAt || save.player.stamina < fruit.staminaCost) return;
 
-    this.pullReadyAt = this.time.now + 560;
+    this.pullReadyAt = this.time.now + 560 * fruit.cooldownMultiplier;
     save.player.stamina -= fruit.staminaCost;
     const range = fruit.range;
     let affected = 0;
@@ -621,14 +652,15 @@ export class HarrowScene extends Phaser.Scene {
 
   private dash(): void {
     const save = SaveManager.get();
-    if (this.dead || this.time.now < this.dashReadyAt || save.player.stamina < 18) return;
+    const combat = playerCombatStats(save);
+    if (this.dead || this.time.now < this.dashReadyAt || save.player.stamina < combat.dashCost) return;
 
     let v = this.getMove();
     if (v.lengthSq() < 0.01) v = this.lastFacing.clone();
     else this.lastFacing.copy(v).normalize();
     v.normalize();
 
-    save.player.stamina -= 18;
+    save.player.stamina -= combat.dashCost;
     this.dashReadyAt = this.time.now + 680;
     this.dashUntil = this.time.now + 175;
     this.player.setVelocity(v.x * 560, v.y * 560);
@@ -672,7 +704,8 @@ export class HarrowScene extends Phaser.Scene {
 
   private damagePlayer(amount: number): void {
     if (this.time.now < this.damageGraceUntil) return;
-    this.damageGraceUntil = this.time.now + 240;
+    this.damageGraceUntil = this.time.now + 420;
+    this.hitStunUntil = this.time.now + 125;
     const save = SaveManager.get();
     const reduction = equippedEffects(save.player.equipment).damageReduction;
     save.player.hp = Math.max(0, save.player.hp - Math.max(1, amount - reduction));
@@ -740,9 +773,10 @@ export class HarrowScene extends Phaser.Scene {
     const body = unit.sprite.body as Phaser.Physics.Arcade.Body;
     body.enable = false;
 
-    const name = unit.id === 'sera' ? 'SERA QUILL' : 'ROWAN VALE';
+    const state = SaveManager.get().crew.find((member) => member.id === unit.id);
+    const name = state?.name.toUpperCase() ?? unit.id.toUpperCase();
     unit.label
-      ?.setText(`${name} · DOWN`)
+      ?.setText(name + ' · DOWN')
       .setColor('#ffd3ca')
       .setBackgroundColor('#341a1acc')
       .setAlpha(1);
@@ -800,6 +834,14 @@ export class HarrowScene extends Phaser.Scene {
         ?.setPosition(unit.sprite.x, unit.sprite.y - 64)
         .setAlpha(1);
     }
+  }
+
+  private crewTexture(id: string, visualArchetype: string | undefined, role: string): string {
+    if (id === 'sera') return 'sera';
+    if (id === 'rowan') return 'rowan';
+    if (visualArchetype === 'crew-medic') return 'crew-medic';
+    if (visualArchetype === 'crew-fighter' || role.toLowerCase().includes('fighter')) return 'rowan';
+    return 'crew-specialist';
   }
 
   private makeProp(x: number, y: number, key: string, mass: number): Phaser.Physics.Arcade.Image {
