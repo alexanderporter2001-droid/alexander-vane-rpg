@@ -16,13 +16,8 @@ export interface DialogueAIResult {
   };
 }
 
-const DEFAULT_ENDPOINT = 'https://alexander-vane-rpg.vercel.app/api/dialogue';
+const DIALOGUE_ENDPOINT = 'https://alexander-vane-rpg.vercel.app/api/dialogue';
 const MEMORY_PREFIX = 'dialogueMemory-';
-
-function endpoint(): string {
-  const configured = (import.meta.env.VITE_DIALOGUE_API_URL as string | undefined)?.trim();
-  return configured || DEFAULT_ENDPOINT;
-}
 
 function memoriesFor(save: CampaignSave, speaker: DialogueSpeakerId): string[] {
   const raw = save.world.flags[`${MEMORY_PREFIX}${speaker}`];
@@ -100,7 +95,7 @@ export async function resolveDialogueAI(
   const timeout = window.setTimeout(() => controller.abort(), 18_000);
 
   try {
-    const response = await fetch(endpoint(), {
+    const response = await fetch(DIALOGUE_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
