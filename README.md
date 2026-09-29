@@ -4,7 +4,7 @@ A private, persistent, consequence-driven pirate RPG built around Alexander Vane
 
 This repository replaces the Floot prototype as the permanent source of truth. Hosting is replaceable; campaign continuity and versioned saves are not.
 
-## Current foundation — v0.3.8
+## Current foundation — v0.3.9
 
 The current vertical slice is built as a complete local loop rather than disconnected demos:
 
@@ -33,7 +33,12 @@ The current vertical slice is built as a complete local loop rather than disconn
 26. Island arrival now stops the Wayward Gull at an offshore harbor approach, switches out of deck view, and uses a separate exterior docking animation instead of letting the deck visually pass over island terrain.
 27. Ships are prevented from driving directly through island land geometry on the sea map.
 
-Typed freeform dialogue is now real: the text box resolves supported intent, topic, speaker knowledge, and crew/world state locally. Arbitrary freeform world actions remain absent until they can resolve into actual mechanics rather than being logged as fake text.
+28. Typed NPC dialogue now uses a secure Vercel server function backed by the OpenAI Responses API; the browser never receives the OpenAI API key.
+29. Core crew dialogue (Sera and Rowan) routes to the deeper crew model while service NPCs use the lower-cost world model. Model IDs can be changed with server environment variables without rebuilding the game.
+30. Conversations preserve recent turns plus compact per-NPC memories. The server enforces NPC-specific profiles and knowledge boundaries, including the current hidden-Haki rule.
+31. Sera can turn a clear typed course order into a validated in-game destination change instead of merely acknowledging it in dialogue. If the AI service is unavailable, the existing local intent resolver remains the fallback.
+
+Typed freeform dialogue now has a live AI path with structured output, bounded context, persistent compact memories, and a local offline fallback. AI responses may propose only explicitly supported game actions; the simulation remains responsible for applying them.
 
 ## Development
 
