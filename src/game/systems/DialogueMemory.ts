@@ -72,9 +72,40 @@ function trimMemories(records: DialogueMemoryRecord[]): DialogueMemoryRecord[] {
   return copy;
 }
 
-export function dialogueMemories(save: CampaignSave, speaker: DialogueSpeakerId): string[] {
-  return parseMemories(save.world.flags[`${MEMORY_PREFIX}${speaker}`])
-    .map((entry) => `Day ${entry.day} · ${entry.importance}: ${entry.text}`);
+function searchTerms(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .filter((term) => term.length >= 4),
+  );
+}
+
+export function dialogueMemories(
+  save: CampaignSave,
+  speaker: DialogueSpeakerId,
+  query = '',
+  limit = 5,
+): string[] {
+  const queryTerms = searchTerms(query);
+  const records = parseMemories(save.world.flags[`${MEMORY_PREFIX}${speaker}`]);
+
+  return records
+    .map((entry, index) => {
+      const entryTerms = searchTerms(entry.text);
+      let overlap = 0;
+      for (const term of queryTerms) {
+        if (entryTerms.has(term)) overlap += 1;
+      }
+
+      const importanceScore = entry.importance === 'core' ? 8 : entry.importance === 'notable' ? 3 : 0;
+      const recencyScore = index / Math.max(1, records.length);
+      return { entry, score: importanceScore + overlap * 4 + recencyScore };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Math.max(1, limit))
+    .map(({ entry }) => `Day ${entry.day} · ${entry.importance}: ${entry.text}`);
 }
 
 export function saveDialogueMemory(
