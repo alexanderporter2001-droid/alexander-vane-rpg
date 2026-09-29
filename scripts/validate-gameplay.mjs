@@ -19,7 +19,7 @@ const checks = [
   ['Harrow remembers facing direction', harrow.includes('lastFacing') && harrow.includes('getAttackFacing')],
   ['mobile melee assists nearby targets', harrow.includes('entry.distance <= 96')],
   ['defeated Marines are marked down', harrow.includes("'DOWN'") && harrow.includes("setData('downed', true)")],
-  ['hit flash preserves downed tint', harrow.includes("!target.getData('downed')")],
+  ['hit flash preserves downed tint', harrow.includes("target.getData('downed')") && harrow.includes('setTint(0x555b5f)')],
   ['downed crew are visibly marked', harrow.includes('markCrewDown')],
   ['first Marine starts on land', harrow.includes("[470, 610, 'melee']")],
   ['AI movement checks character-safe walkability', harrow.includes('isCharacterWalkable(nextX, nextY)')],
