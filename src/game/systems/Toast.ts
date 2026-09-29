@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 
 export class Toast {
   private root: HTMLDivElement;
-  private timer: number | null = null;
+  private hideTimer: number | null = null;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(private scene: Phaser.Scene) {
     this.root = document.createElement('div');
     this.root.className = 'game-toast';
     this.root.setAttribute('role', 'status');
@@ -15,21 +15,24 @@ export class Toast {
   }
 
   show(message: string, ms = 2200): void {
-    if (this.timer !== null) window.clearTimeout(this.timer);
+    if (this.hideTimer !== null) {
+      window.clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
 
     this.root.textContent = message;
     this.root.classList.add('is-visible');
 
-    this.timer = window.setTimeout(() => {
+    this.hideTimer = window.setTimeout(() => {
       this.root.classList.remove('is-visible');
-      this.timer = null;
+      this.hideTimer = null;
     }, ms);
   }
 
   destroy(): void {
-    if (this.timer !== null) {
-      window.clearTimeout(this.timer);
-      this.timer = null;
+    if (this.hideTimer !== null) {
+      window.clearTimeout(this.hideTimer);
+      this.hideTimer = null;
     }
     this.root.remove();
   }
