@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
-import { MobileControls } from '../systems/MobileControls';
+import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { Toast } from '../systems/Toast';
 import { advanceWorldClock, formatWorldTime } from '../systems/WorldClock';
 
@@ -58,7 +58,7 @@ export class SeaScene extends Phaser.Scene {
     this.toast = new Toast(this);
     this.createHud();
 
-    if (this.sys.game.device.input.touch) {
+    if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {
         primary: () => undefined,
         secondary: () => undefined,

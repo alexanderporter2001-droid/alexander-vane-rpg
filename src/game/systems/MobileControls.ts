@@ -9,10 +9,19 @@ export interface MobileActions {
   pause: () => void;
 }
 
+export function shouldUseMobileControls(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const coarsePointer = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(pointer: coarse)').matches
+    : false;
+  return navigator.maxTouchPoints > 0 || coarsePointer || window.innerWidth <= 900;
+}
+
 export class MobileControls {
   readonly move = new Phaser.Math.Vector2();
 
   private root: Phaser.GameObjects.Container;
+  private stickZone: Phaser.GameObjects.Zone;
   private stickBase: Phaser.GameObjects.Arc;
   private stickNub: Phaser.GameObjects.Arc;
   private stickPointerId: number | null = null;
@@ -22,46 +31,45 @@ export class MobileControls {
   private interact: Phaser.GameObjects.Container;
   private interactText: Phaser.GameObjects.Text;
   private order?: Phaser.GameObjects.Container;
-  private pause: Phaser.GameObjects.Text;
+  private pause: Phaser.GameObjects.Container;
+
+  private readonly pointerMoveHandler: (pointer: Phaser.Input.Pointer) => void;
+  private readonly pointerUpHandler: (pointer: Phaser.Input.Pointer) => void;
 
   constructor(private scene: Phaser.Scene, private actions: MobileActions) {
     this.root = scene.add.container(0, 0).setScrollFactor(0).setDepth(3000);
 
-    this.stickBase = scene.add.circle(92, 92, 58, 0xddebf0, 0.11)
-      .setStrokeStyle(2, 0xddebf0, 0.24)
-      .setInteractive();
-    this.stickNub = scene.add.circle(92, 92, 23, 0xe8f0f3, 0.32);
-    this.root.add([this.stickBase, this.stickNub]);
+    this.stickZone = scene.add.zone(92, 92, 190, 190).setInteractive();
+    this.stickBase = scene.add.circle(92, 92, 62, 0xddebf0, 0.13)
+      .setStrokeStyle(2, 0xddebf0, 0.32);
+    this.stickNub = scene.add.circle(92, 92, 25, 0xe8f0f3, 0.42);
+    this.root.add([this.stickZone, this.stickBase, this.stickNub]);
 
-    this.stickBase.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      this.stickPointerId = p.id;
-      this.updateStick(p);
-    });
-    scene.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-      if (p.isDown && p.id === this.stickPointerId) this.updateStick(p);
-    });
-    scene.input.on('pointerup', (p: Phaser.Input.Pointer) => {
-      if (p.id === this.stickPointerId) this.resetStick();
+    this.stickZone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      this.stickPointerId = pointer.id;
+      this.updateStick(pointer);
     });
 
-    this.attack = this.makeButton('ATTACK', actions.primary, 76, 0xd8b45f);
-    this.secondary = this.makeButton('PULL', actions.secondary, 68, 0x79bfd3);
-    this.dash = this.makeButton('DASH', actions.dash, 62, 0xb2c2ca);
-    this.interact = this.makeButton('INTERACT', actions.interact, 68, 0x78c690);
-    this.interactText = this.interact.getAt(1) as Phaser.GameObjects.Text;
+    this.pointerMoveHandler = (pointer: Phaser.Input.Pointer) => {
+      if (pointer.isDown && pointer.id === this.stickPointerId) this.updateStick(pointer);
+    };
+    this.pointerUpHandler = (pointer: Phaser.Input.Pointer) => {
+      if (pointer.id === this.stickPointerId) this.resetStick();
+    };
+    scene.input.on('pointermove', this.pointerMoveHandler);
+    scene.input.on('pointerup', this.pointerUpHandler);
 
-    if (actions.order) this.order = this.makeButton('ORDER', actions.order, 58, 0xc89ac8);
+    this.attack = this.makeButton('ATTACK', actions.primary, 78, 0xd8b45f);
+    this.secondary = this.makeButton('PULL', actions.secondary, 72, 0x79bfd3);
+    this.dash = this.makeButton('DASH', actions.dash, 70, 0xb2c2ca);
+    this.interact = this.makeButton('INTERACT', actions.interact, 74, 0x78c690);
+    this.interactText = this.interact.getAt(2) as Phaser.GameObjects.Text;
+
+    if (actions.order) this.order = this.makeButton('ORDER', actions.order, 66, 0xc89ac8);
     this.root.add([this.attack, this.secondary, this.dash, this.interact]);
     if (this.order) this.root.add(this.order);
 
-    this.pause = scene.add.text(0, 0, '☰', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '28px',
-      color: '#edf4f6',
-      backgroundColor: '#071116cc',
-      padding: { x: 12, y: 7 },
-    }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
-    this.pause.on('pointerdown', actions.pause);
+    this.pause = this.makeButton('☰', actions.pause, 58, 0xa8c5ce);
     this.root.add(this.pause);
 
     this.layout();
@@ -69,8 +77,8 @@ export class MobileControls {
     scene.scale.on('resize', this.layout, this);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       scene.scale.off('resize', this.layout, this);
-      scene.input.off('pointermove');
-      scene.input.off('pointerup');
+      scene.input.off('pointermove', this.pointerMoveHandler);
+      scene.input.off('pointerup', this.pointerUpHandler);
     });
   }
 
@@ -92,54 +100,65 @@ export class MobileControls {
   }
 
   destroy(): void {
+    this.resetStick();
     this.root.destroy(true);
   }
 
   private makeButton(label: string, action: () => void, diameter: number, accent: number): Phaser.GameObjects.Container {
-    const circle = this.scene.add.circle(0, 0, diameter / 2, 0x172832, 0.92)
-      .setStrokeStyle(2, accent, 0.55)
-      .setInteractive({ useHandCursor: true });
+    const hit = this.scene.add.zone(0, 0, diameter + 30, diameter + 30).setInteractive();
+    const circle = this.scene.add.circle(0, 0, diameter / 2, 0x172832, 0.94)
+      .setStrokeStyle(2, accent, 0.72);
     const text = this.scene.add.text(0, 0, label, {
       fontFamily: 'system-ui, sans-serif',
-      fontSize: label.length > 7 ? '10px' : '11px',
+      fontSize: label === '☰' ? '25px' : label.length > 7 ? '10px' : '11px',
       fontStyle: 'bold',
       color: '#f2f6f7',
       align: 'center',
     }).setOrigin(0.5);
-    const c = this.scene.add.container(0, 0, [circle, text]);
-    circle.on('pointerdown', () => {
-      c.setScale(0.92);
+
+    const container = this.scene.add.container(0, 0, [hit, circle, text]);
+    hit.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pointer.event?.preventDefault?.();
+      container.setScale(0.92);
       action();
     });
-    circle.on('pointerup', () => c.setScale(1));
-    circle.on('pointerout', () => c.setScale(1));
-    return c;
+    hit.on('pointerup', () => container.setScale(1));
+    hit.on('pointerout', () => container.setScale(1));
+    return container;
   }
 
   private layout(): void {
     const w = this.scene.scale.width;
     const h = this.scene.scale.height;
-    const safeBottom = 24;
+    const safeBottom = 34;
+    const compact = w < 430;
 
-    this.stickBase.setPosition(92, h - 112 - safeBottom);
-    this.stickNub.setPosition(this.stickBase.x, this.stickBase.y);
+    const stickX = compact ? 88 : 102;
+    const stickY = h - (compact ? 118 : 126) - safeBottom;
+    this.stickZone.setPosition(stickX, stickY);
+    this.stickBase.setPosition(stickX, stickY);
+    this.stickNub.setPosition(stickX, stickY);
 
-    this.attack.setPosition(w - 76, h - 112 - safeBottom);
-    this.secondary.setPosition(w - 150, h - 178 - safeBottom);
-    this.dash.setPosition(w - 164, h - 92 - safeBottom);
-    this.order?.setPosition(w - 76, h - 210 - safeBottom);
-    this.interact.setPosition(w - 82, h - 286 - safeBottom);
-    this.pause.setPosition(w - 18, 18);
+    this.attack.setPosition(w - (compact ? 68 : 82), h - 118 - safeBottom);
+    this.secondary.setPosition(w - (compact ? 142 : 160), h - 188 - safeBottom);
+    this.dash.setPosition(w - (compact ? 154 : 174), h - 92 - safeBottom);
+    this.order?.setPosition(w - (compact ? 70 : 84), h - 216 - safeBottom);
+    this.interact.setPosition(w - (compact ? 76 : 88), h - 300 - safeBottom);
+    this.pause.setPosition(w - 48, 50);
   }
 
   private updateStick(pointer: Phaser.Input.Pointer): void {
+    pointer.event?.preventDefault?.();
     const center = new Phaser.Math.Vector2(this.stickBase.x, this.stickBase.y);
-    const d = new Phaser.Math.Vector2(pointer.x - center.x, pointer.y - center.y);
-    const max = 46;
-    if (d.length() > max) d.setLength(max);
-    this.stickNub.setPosition(center.x + d.x, center.y + d.y);
-    this.move.set(d.x / max, d.y / max);
+    const delta = new Phaser.Math.Vector2(pointer.x - center.x, pointer.y - center.y);
+    const max = 50;
+    if (delta.length() > max) delta.setLength(max);
+
+    this.stickNub.setPosition(center.x + delta.x, center.y + delta.y);
+    this.move.set(delta.x / max, delta.y / max);
     if (this.move.length() > 1) this.move.normalize();
+
+    if (this.move.length() < 0.08) this.move.set(0, 0);
   }
 
   private resetStick(): void {

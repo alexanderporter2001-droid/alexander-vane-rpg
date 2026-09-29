@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
 import { DialoguePanel, type DialogueChoice } from '../systems/DialoguePanel';
-import { MobileControls } from '../systems/MobileControls';
+import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
 import { advanceWorldClock, advanceWorldMinutes, formatWorldTime } from '../systems/WorldClock';
@@ -11,6 +11,7 @@ export class GullrockScene extends Phaser.Scene {
   private readonly worldH = 980;
   private player!: Phaser.Physics.Arcade.Sprite;
   private crew: Phaser.Physics.Arcade.Sprite[] = [];
+  private crewLabels: Phaser.GameObjects.Text[] = [];
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private mobile?: MobileControls;
   private interactions!: InteractionSystem;
@@ -38,9 +39,12 @@ export class GullrockScene extends Phaser.Scene {
     this.player.setBodySize(34, 30).setOffset(19, 70);
     this.lastValid.set(savedSpawn.x, savedSpawn.y);
 
-    this.crew = [
-      this.physics.add.sprite(665, 825, 'sera').setDepth(48).setCollideWorldBounds(true),
-      this.physics.add.sprite(785, 825, 'rowan').setDepth(49).setCollideWorldBounds(true),
+    const sera = this.physics.add.sprite(665, 825, 'sera').setDepth(48).setCollideWorldBounds(true);
+    const rowan = this.physics.add.sprite(785, 825, 'rowan').setDepth(49).setCollideWorldBounds(true);
+    this.crew = [sera, rowan];
+    this.crewLabels = [
+      this.makeCrewLabel(sera, 'SERA QUILL · Navigator', '#d6edf6'),
+      this.makeCrewLabel(rowan, 'ROWAN VALE · Fighter', '#f0d9cb'),
     ];
 
     this.dialogue = new DialoguePanel(this);
@@ -50,7 +54,7 @@ export class GullrockScene extends Phaser.Scene {
     this.registerInteractions();
     this.createHud();
 
-    if (this.sys.game.device.input.touch) {
+    if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {
         primary: () => undefined,
         secondary: () => undefined,
@@ -148,6 +152,25 @@ export class GullrockScene extends Phaser.Scene {
     const [sera, rowan] = this.crew;
     if (sera) this.follow(sera, this.player.x - 55, this.player.y + 40, 138);
     if (rowan) this.follow(rowan, this.player.x + 58, this.player.y + 28, 150);
+    this.syncCrewLabels();
+  }
+
+  private makeCrewLabel(sprite: Phaser.Physics.Arcade.Sprite, text: string, color: string): Phaser.GameObjects.Text {
+    return this.add.text(sprite.x, sprite.y - 58, text, {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '11px',
+      fontStyle: 'bold',
+      color,
+      backgroundColor: '#071116c9',
+      padding: { x: 5, y: 3 },
+    }).setOrigin(0.5, 1).setDepth(84);
+  }
+
+  private syncCrewLabels(): void {
+    this.crewLabels.forEach((label, index) => {
+      const sprite = this.crew[index];
+      if (sprite) label.setPosition(sprite.x, sprite.y - 58);
+    });
   }
 
   private follow(sprite: Phaser.Physics.Arcade.Sprite, x: number, y: number, speed: number): void {
@@ -157,7 +180,19 @@ export class GullrockScene extends Phaser.Scene {
       return;
     }
     v.normalize().scale(speed);
-    sprite.setVelocity(v.x, v.y);
+    const lookahead = 0.14;
+    const nextX = sprite.x + v.x * lookahead;
+    const nextY = sprite.y + v.y * lookahead;
+
+    if (this.isWalkable(nextX, nextY)) {
+      sprite.setVelocity(v.x, v.y);
+    } else if (this.isWalkable(nextX, sprite.y)) {
+      sprite.setVelocity(v.x, 0);
+    } else if (this.isWalkable(sprite.x, nextY)) {
+      sprite.setVelocity(0, v.y);
+    } else {
+      sprite.setVelocity(0, 0);
+    }
   }
 
   private registerInteractions(): void {
@@ -602,7 +637,7 @@ export class GullrockScene extends Phaser.Scene {
       formatWorldTime(save),
       `Berries ${save.player.berries.toLocaleString()}`,
       `Gull hull ${Math.ceil(save.ship.hull)}/${save.ship.maxHull} · Supplies ${Math.floor(save.ship.supplies)}`,
-      this.sys.game.device.input.touch
+      this.mobile
         ? 'Use INTERACT near people and objects'
         : 'F near people and objects',
     ]);

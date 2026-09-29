@@ -1,14 +1,15 @@
 {
   "name": "alexander-vane-rpg",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "check": "tsc -b --pretty false",
     "validate:save": "node scripts/validate-save.mjs",
-    "test": "npm run validate:save && npm run check"
+    "validate:gameplay": "node scripts/validate-gameplay.mjs",
+    "test": "npm run validate:save && npm run validate:gameplay && npm run check"
   },
   "dependencies": {
     "phaser": "^3.90.0"

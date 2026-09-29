@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
 import type { CaptainOrder } from '../state/types';
-import { MobileControls } from '../systems/MobileControls';
+import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
 import { advanceWorldClock, formatWorldTime } from '../systems/WorldClock';
@@ -23,6 +23,7 @@ interface EnemyUnit {
 interface CrewUnit {
   id: 'sera' | 'rowan';
   sprite: Phaser.Physics.Arcade.Sprite;
+  label?: Phaser.GameObjects.Text;
   hp: number;
   attackReadyAt: number;
 }
@@ -85,10 +86,21 @@ export class HarrowScene extends Phaser.Scene {
         attackReadyAt: 0,
       },
     ];
-    for (const unit of this.crew) unit.sprite.setBodySize(32, 28).setOffset(20, 72).setCollideWorldBounds(true);
+    for (const unit of this.crew) {
+      unit.sprite.setBodySize(32, 28).setOffset(20, 72).setCollideWorldBounds(true);
+      const title = unit.id === 'sera' ? 'SERA QUILL · Navigator' : 'ROWAN VALE · Fighter';
+      unit.label = this.add.text(unit.sprite.x, unit.sprite.y - 58, title, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: unit.id === 'sera' ? '#d6edf6' : '#f0d9cb',
+        backgroundColor: '#071116c9',
+        padding: { x: 5, y: 3 },
+      }).setOrigin(0.5, 1).setDepth(84);
+    }
 
     const defs: Array<[number, number, EnemyRole]> = [
-      [470, 470, 'melee'],
+      [470, 610, 'melee'],
       [760, 495, 'melee'],
       [930, 415, 'rifle'],
       [1085, 305, 'melee'],
@@ -145,7 +157,7 @@ export class HarrowScene extends Phaser.Scene {
     this.toast = new Toast(this);
     this.createHud();
 
-    if (this.sys.game.device.input.touch) {
+    if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {
         primary: () => this.attack(),
         secondary: () => this.pull(),
@@ -182,6 +194,7 @@ export class HarrowScene extends Phaser.Scene {
     this.updatePlayer(dt);
     this.updateEnemies(dt);
     this.updateCrew(dt);
+    this.syncCrewLabels();
     this.updateProps();
     this.updateBullets();
 
@@ -292,7 +305,7 @@ export class HarrowScene extends Phaser.Scene {
     save.player.position = { x: this.player.x, y: this.player.y };
   }
 
-  private updateEnemies(dt: number): void {
+  private updateEnemies(_dt: number): void {
     const save = SaveManager.get();
 
     for (const enemy of this.enemies) {
@@ -322,7 +335,7 @@ export class HarrowScene extends Phaser.Scene {
       } else {
         if (dist < 180) {
           const away = new Phaser.Math.Vector2(enemy.sprite.x - this.player.x, enemy.sprite.y - this.player.y).normalize();
-          enemy.sprite.setVelocity(away.x * 95, away.y * 95);
+          this.setWalkableVelocity(enemy.sprite, away.x * 95, away.y * 95);
         } else if (dist > 350) {
           this.moveToward(enemy.sprite, this.player.x, this.player.y, 78);
         } else {
@@ -331,11 +344,9 @@ export class HarrowScene extends Phaser.Scene {
         if (dist < 470 && this.time.now >= enemy.attackReadyAt) this.rifleWindup(enemy);
       }
 
-      if (!this.isWalkable(enemy.sprite.x, enemy.sprite.y)) {
-        enemy.sprite.setPosition(enemy.patrolX, enemy.patrolY).setVelocity(0, 0);
+      if (!this.isCharacterWalkable(enemy.sprite.x, enemy.sprite.y)) {
+        enemy.sprite.setVelocity(0, 0);
       }
-
-      if (dt > 0.04) enemy.sprite.setVelocity(enemy.sprite.body?.velocity.x ?? 0, enemy.sprite.body?.velocity.y ?? 0);
     }
   }
 
@@ -491,7 +502,12 @@ export class HarrowScene extends Phaser.Scene {
       if (d > range) continue;
       const n = new Phaser.Math.Vector2(this.player.x - enemy.sprite.x, this.player.y - enemy.sprite.y).normalize();
       const resistance = enemy.role === 'melee' ? 0.86 : 1;
-      enemy.sprite.setVelocity(n.x * save.player.fruit.force * resistance, n.y * save.player.fruit.force * resistance);
+      this.setWalkableVelocity(
+        enemy.sprite,
+        n.x * save.player.fruit.force * resistance,
+        n.y * save.player.fruit.force * resistance,
+        0.08,
+      );
       enemy.alert = true;
       affected += 1;
     }
@@ -628,7 +644,42 @@ export class HarrowScene extends Phaser.Scene {
       return;
     }
     v.normalize().scale(speed);
-    sprite.setVelocity(v.x, v.y);
+    this.setWalkableVelocity(sprite, v.x, v.y);
+  }
+
+  private setWalkableVelocity(
+    sprite: Phaser.Physics.Arcade.Sprite,
+    vx: number,
+    vy: number,
+    lookahead = 0.14,
+  ): void {
+    const nextX = sprite.x + vx * lookahead;
+    const nextY = sprite.y + vy * lookahead;
+
+    if (this.isCharacterWalkable(nextX, nextY)) {
+      sprite.setVelocity(vx, vy);
+      return;
+    }
+
+    if (this.isCharacterWalkable(nextX, sprite.y)) {
+      sprite.setVelocity(vx, 0);
+      return;
+    }
+
+    if (this.isCharacterWalkable(sprite.x, nextY)) {
+      sprite.setVelocity(0, vy);
+      return;
+    }
+
+    sprite.setVelocity(0, 0);
+  }
+
+  private syncCrewLabels(): void {
+    for (const unit of this.crew) {
+      unit.label
+        ?.setPosition(unit.sprite.x, unit.sprite.y - 58)
+        .setAlpha(unit.hp > 0 ? 1 : 0.45);
+    }
   }
 
   private makeProp(x: number, y: number, key: string, mass: number): Phaser.Physics.Arcade.Image {
@@ -666,6 +717,22 @@ export class HarrowScene extends Phaser.Scene {
     const eastDock = x >= 920 && x <= 1375 && y >= 220 && y <= 370;
     const shipRamp = x >= 1170 && x <= 1310 && y >= 165 && y <= 280;
     return land || centerDock || eastWalk || eastDock || shipRamp;
+  }
+
+  private isCharacterWalkable(x: number, y: number): boolean {
+    const margin = 12;
+    const samples: Array<[number, number]> = [
+      [x, y],
+      [x - margin, y],
+      [x + margin, y],
+      [x, y - margin],
+      [x, y + margin],
+      [x - margin, y - margin],
+      [x + margin, y - margin],
+      [x - margin, y + margin],
+      [x + margin, y + margin],
+    ];
+    return samples.every(([px, py]) => this.isWalkable(px, py));
   }
 
   private drawHarbor(): void {
