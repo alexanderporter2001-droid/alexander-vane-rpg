@@ -271,6 +271,10 @@ button,input,textarea{font:inherit}
 .dialogue-line-npc{
   margin-right:8%;
 }
+.dialogue-line-thinking{
+  opacity:.62;
+  font-style:italic;
+}
 .dialogue-freeform{
   flex:0 0 auto;
   display:flex;
@@ -306,6 +310,11 @@ button,input,textarea{font:inherit}
   font-weight:900;
   touch-action:manipulation;
   -webkit-tap-highlight-color:transparent;
+}
+.dialogue-send:disabled,
+.dialogue-input:disabled{
+  opacity:.58;
+  cursor:wait;
 }
 
 .dialogue-choices{
