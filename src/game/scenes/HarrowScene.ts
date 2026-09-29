@@ -294,6 +294,7 @@ export class HarrowScene extends Phaser.Scene {
         ]);
     const alerted = this.enemies.filter((e) => e.alert && e.hp > 0).length;
     this.status.setText(`Harrow Docks\n${formatWorldTime(save)}${alerted ? `\n${alerted} alerted` : ''}`);
+    this.crewHud.setVisible(alerted > 0);
     this.crewHud.update(this.crew.map((unit) => {
       const state = save.crew.find((member) => member.id === unit.id);
       return {
