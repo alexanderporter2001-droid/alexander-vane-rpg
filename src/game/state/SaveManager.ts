@@ -8,6 +8,17 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
 }
 
+function primitiveFlags(raw: unknown): Record<string, boolean | string | number> {
+  if (!isObject(raw)) return {};
+  const result: Record<string, boolean | string | number> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === 'boolean' || typeof value === 'string' || typeof value === 'number') {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 function normalizedLoadout(raw: unknown): EquipmentLoadout {
   const source = isObject(raw) ? raw : {};
   const clean = (value: unknown) => typeof value === 'string' ? value : null;
@@ -107,14 +118,7 @@ function normalizeCurrent(raw: Record<string, any>): CampaignSave {
     ...fresh.world,
     ...oldWorld,
     flags: isObject(oldWorld.flags)
-      ? {
-          ...fresh.world.flags,
-          ...Object.fromEntries(
-            Object.entries(oldWorld.flags).filter(([, value]) =>
-              typeof value === 'boolean' || typeof value === 'string' || typeof value === 'number'
-            ),
-          ),
-        }
+      ? { ...fresh.world.flags, ...primitiveFlags(oldWorld.flags) }
       : fresh.world.flags,
     canonLedger: Array.isArray(oldWorld.canonLedger) ? oldWorld.canonLedger : fresh.world.canonLedger,
   };
