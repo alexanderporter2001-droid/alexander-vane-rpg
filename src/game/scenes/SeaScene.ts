@@ -645,14 +645,27 @@ export class SeaScene extends Phaser.Scene {
           current.world.flags[`talkedTo-${id}`] = true;
           const result = await resolveDialogueAI(id, message, current, history);
 
-          if (id === 'sera' && result.action?.type === 'set_course') {
-            const port = this.ports.find((candidate) => candidate.id === result.action?.target);
+          if (id === 'sera' && result.action.type === 'set_course') {
+            const port = this.ports.find((candidate) => candidate.id === result.action.target);
             if (port) {
               current.world.flags.shipDestination = port.id;
               this.navTarget = port;
               this.arrivalReady = false;
               this.arrivalNotifiedPortId = null;
               if (this.navigationMode === 'sera' && this.speed < 35) this.speed = 52;
+              this.applyNavigationPresentation(false);
+            }
+          }
+
+          if (id === 'sera' && result.action.type === 'set_helm') {
+            if (result.action.target === 'sera' && this.canSeraNavigate()) {
+              this.navigationMode = 'sera';
+              current.world.flags.sailingDelegated = true;
+              if (this.speed < 35) this.speed = 52;
+              this.applyNavigationPresentation(false);
+            } else if (result.action.target === 'alexander') {
+              this.navigationMode = 'manual';
+              current.world.flags.sailingDelegated = false;
               this.applyNavigationPresentation(false);
             }
           }
