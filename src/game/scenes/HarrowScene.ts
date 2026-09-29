@@ -10,6 +10,7 @@ type EnemyRole = 'melee' | 'rifle';
 
 interface EnemyUnit {
   sprite: Phaser.Physics.Arcade.Sprite;
+  downLabel?: Phaser.GameObjects.Text;
   role: EnemyRole;
   hp: number;
   alert: boolean;
@@ -46,6 +47,7 @@ export class HarrowScene extends Phaser.Scene {
   private status!: Phaser.GameObjects.Text;
 
   private order: CaptainOrder = 'regroup';
+  private lastFacing = new Phaser.Math.Vector2(1, 0);
   private attackReadyAt = 0;
   private pullReadyAt = 0;
   private dashReadyAt = 0;
@@ -90,7 +92,7 @@ export class HarrowScene extends Phaser.Scene {
     ];
     for (const unit of this.crew) {
       unit.sprite.setBodySize(32, 28).setOffset(20, 72).setCollideWorldBounds(true);
-      const title = unit.id === 'sera' ? 'SERA QUILL · Navigator' : 'ROWAN VALE · Fighter';
+      const title = unit.id === 'sera' ? 'SERA QUILL' : 'ROWAN VALE';
       unit.label = this.add.text(unit.sprite.x, unit.sprite.y - 58, title, {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '11px',
@@ -99,6 +101,7 @@ export class HarrowScene extends Phaser.Scene {
         backgroundColor: '#071116c9',
         padding: { x: 5, y: 3 },
       }).setOrigin(0.5, 1).setDepth(84);
+      if (unit.hp <= 0) this.markCrewDown(unit);
     }
 
     const defs: Array<[number, number, EnemyRole]> = [
@@ -141,7 +144,8 @@ export class HarrowScene extends Phaser.Scene {
         if (!bullet.active || unit.hp <= 0) return;
         bullet.disableBody(true, true);
         unit.hp = Math.max(0, unit.hp - 10);
-        this.hitFlash(unit.sprite);
+        if (unit.hp <= 0) this.markCrewDown(unit);
+        else this.hitFlash(unit.sprite);
         if (unit.hp <= 0) this.downCrew(unit);
       });
     }
@@ -459,26 +463,15 @@ export class HarrowScene extends Phaser.Scene {
     if (this.dead || this.time.now < this.attackReadyAt) return;
     this.attackReadyAt = this.time.now + 380;
 
-    let facing = this.getMove();
-    if (facing.lengthSq() > 0.01) {
-      facing.normalize();
-      this.lastFacing.copy(facing);
-    } else {
-      facing = this.lastFacing.clone();
-    }
+    const facing = this.getAttackFacing();
+    this.lastFacing.copy(facing);
 
-    if (this.mobile) {
-      const assisted = this.mobileAttackFacing(facing);
-      if (assisted) facing = assisted;
-    }
-
-    const attackRange = this.mobile ? 86 : 72;
     const slash = this.add.arc(
       this.player.x,
       this.player.y,
-      attackRange - 12,
-      Phaser.Math.RadToDeg(facing.angle() - 0.9),
-      Phaser.Math.RadToDeg(facing.angle() + 0.9),
+      62,
+      Phaser.Math.RadToDeg(facing.angle() - 0.95),
+      Phaser.Math.RadToDeg(facing.angle() + 0.95),
       false,
       0xffefbd,
       0,
@@ -488,8 +481,8 @@ export class HarrowScene extends Phaser.Scene {
     for (const enemy of this.enemies) {
       if (enemy.hp <= 0) continue;
       const to = new Phaser.Math.Vector2(enemy.sprite.x - this.player.x, enemy.sprite.y - this.player.y);
-      if (to.length() > attackRange) continue;
-      if (to.clone().normalize().dot(facing) < -0.05) continue;
+      if (to.length() > 80) continue;
+      if (to.clone().normalize().dot(facing) < -0.08) continue;
       enemy.alert = true;
       enemy.hp -= 26;
       this.hitFlash(enemy.sprite);
@@ -497,27 +490,34 @@ export class HarrowScene extends Phaser.Scene {
     }
   }
 
-  private mobileAttackFacing(baseFacing: Phaser.Math.Vector2): Phaser.Math.Vector2 | null {
-    const target = this.enemies
-      .filter((enemy) => enemy.hp > 0)
-      .map((enemy) => ({
-        enemy,
-        distance: Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.sprite.x, enemy.sprite.y),
-      }))
-      .filter((entry) => entry.distance <= 96)
-      .sort((a, b) => a.distance - b.distance)[0];
+  private getAttackFacing(): Phaser.Math.Vector2 {
+    const input = this.getMove();
+    if (input.lengthSq() > 0.02) return input.normalize();
 
-    if (!target) return null;
+    if (this.mobile) {
+      const nearby = this.enemies
+        .filter((enemy) => enemy.hp > 0)
+        .map((enemy) => ({
+          enemy,
+          distance: Phaser.Math.Distance.Between(
+            this.player.x,
+            this.player.y,
+            enemy.sprite.x,
+            enemy.sprite.y,
+          ),
+        }))
+        .filter((entry) => entry.distance <= 96)
+        .sort((a, b) => a.distance - b.distance)[0];
 
-    const toward = new Phaser.Math.Vector2(
-      target.enemy.sprite.x - this.player.x,
-      target.enemy.sprite.y - this.player.y,
-    ).normalize();
+      if (nearby) {
+        return new Phaser.Math.Vector2(
+          nearby.enemy.sprite.x - this.player.x,
+          nearby.enemy.sprite.y - this.player.y,
+        ).normalize();
+      }
+    }
 
-    if (baseFacing.lengthSq() > 0.01 && toward.dot(baseFacing) < -0.2) return null;
-
-    this.lastFacing.copy(toward);
-    return toward;
+    return this.lastFacing.clone().normalize();
   }
 
   private pull(): void {
@@ -664,37 +664,49 @@ export class HarrowScene extends Phaser.Scene {
 
   private downEnemy(enemy: EnemyUnit): void {
     enemy.hp = 0;
-    enemy.sprite.setData('down', true);
     enemy.sprite.setVelocity(0, 0);
-    enemy.sprite.setAngle(90).setScale(0.82).setTint(0x3e474b).setAlpha(0.82).setDepth(35);
+    enemy.sprite
+      .setData('downed', true)
+      .setTint(0x555b5f)
+      .setAlpha(0.72)
+      .setAngle(90)
+      .setScale(0.9, 0.55);
 
     const body = enemy.sprite.body as Phaser.Physics.Arcade.Body;
     body.enable = false;
     enemy.windup?.destroy();
 
-    enemy.downMarker?.destroy();
-    enemy.downMarker = this.add.text(enemy.sprite.x, enemy.sprite.y - 38, 'DOWN', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '11px',
-      fontStyle: 'bold',
-      color: '#f0d8d2',
-      backgroundColor: '#361d1dcc',
-      padding: { x: 6, y: 3 },
-    }).setOrigin(0.5).setDepth(86);
+    if (!enemy.downLabel) {
+      enemy.downLabel = this.add.text(enemy.sprite.x, enemy.sprite.y - 18, 'DOWN', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#ffd3ca',
+        backgroundColor: '#341a1acc',
+        padding: { x: 6, y: 3 },
+      }).setOrigin(0.5).setDepth(88);
+    }
   }
 
-  private downCrew(unit: CrewUnit): void {
-    if (unit.sprite.getData('down')) return;
-
-    unit.sprite.setData('down', true);
-    unit.sprite.setVelocity(0, 0);
-    unit.sprite.setAngle(90).setScale(0.82).setTint(0x51595c).setAlpha(0.82).setDepth(36);
+  private markCrewDown(unit: CrewUnit): void {
+    unit.hp = 0;
+    unit.sprite
+      .setVelocity(0, 0)
+      .setData('downed', true)
+      .setTint(0x555b5f)
+      .setAlpha(0.74)
+      .setAngle(90)
+      .setScale(0.9, 0.55);
 
     const body = unit.sprite.body as Phaser.Physics.Arcade.Body;
     body.enable = false;
 
     const name = unit.id === 'sera' ? 'SERA QUILL' : 'ROWAN VALE';
-    unit.label?.setText(`${name} · DOWN`).setColor('#f0c8c0').setAlpha(1);
+    unit.label
+      ?.setText(`${name} · DOWN`)
+      .setColor('#ffd3ca')
+      .setBackgroundColor('#341a1acc')
+      .setAlpha(1);
   }
 
   private hitFlash(target: Phaser.GameObjects.Sprite): void {
@@ -745,9 +757,10 @@ export class HarrowScene extends Phaser.Scene {
 
   private syncCrewLabels(): void {
     for (const unit of this.crew) {
+      const yOffset = unit.id === 'sera' ? 62 : 48;
       unit.label
-        ?.setPosition(unit.sprite.x, unit.sprite.y - 58)
-        .setAlpha(unit.hp > 0 ? 1 : 0.45);
+        ?.setPosition(unit.sprite.x, unit.sprite.y - yOffset)
+        .setAlpha(1);
     }
   }
 
