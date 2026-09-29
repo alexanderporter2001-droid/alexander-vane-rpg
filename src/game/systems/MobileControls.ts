@@ -30,10 +30,9 @@ export class MobileControls {
   private order?: HTMLButtonElement;
   private pause: HTMLButtonElement;
   private pointerId: number | null = null;
-  private combatVisible = true;
   private visible = true;
 
-  constructor(private scene: Phaser.Scene, private actions: MobileActions) {
+  constructor(scene: Phaser.Scene, actions: MobileActions) {
     this.root = document.createElement('div');
     this.root.className = 'mobile-controls';
     this.root.setAttribute('aria-label', 'Game controls');
@@ -91,7 +90,6 @@ export class MobileControls {
   }
 
   setCombatVisible(visible: boolean): void {
-    this.combatVisible = visible;
     const display = visible ? 'flex' : 'none';
     this.attack.style.display = display;
     this.secondary.style.display = display;
