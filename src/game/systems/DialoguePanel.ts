@@ -1,5 +1,3 @@
-import Phaser from 'phaser';
-
 export interface DialogueChoice {
   label: string;
   run: () => void;
@@ -14,15 +12,11 @@ export interface DialogueOptions {
 }
 
 export class DialoguePanel {
-  private root: Phaser.GameObjects.Container | null = null;
+  private root: HTMLDivElement | null = null;
   private closeHandler: (() => void) | undefined;
 
-  constructor(private scene: Phaser.Scene) {
-    scene.scale.on('resize', this.onResize, this);
-    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      scene.scale.off('resize', this.onResize, this);
-      this.close(false);
-    });
+  constructor(private scene: { events: { once: (event: string, callback: () => void) => void } }) {
+    scene.events.once('shutdown', () => this.close(false));
   }
 
   isOpen(): boolean {
@@ -33,82 +27,71 @@ export class DialoguePanel {
     this.close(false);
 
     const choices = options.choices ?? [{ label: 'Close', run: () => undefined }];
-    const width = Math.min(720, this.scene.scale.width - 24);
-    const choiceHeight = 38;
-    const bodyHeight = 118;
-    const height = Math.min(
-      this.scene.scale.height - 30,
-      104 + bodyHeight + choices.length * choiceHeight,
-    );
 
-    const bg = this.scene.add.rectangle(0, 0, width, height, 0x071116, 0.97)
-      .setStrokeStyle(2, 0xd8b45f, 0.62);
+    const overlay = document.createElement('div');
+    overlay.className = 'dialogue-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', `Conversation with ${options.speaker}`);
 
-    const speaker = this.scene.add.text(-width / 2 + 20, -height / 2 + 16, options.speaker.toUpperCase(), {
-      fontFamily: 'Georgia, serif',
-      fontSize: '16px',
-      fontStyle: 'bold',
-      color: '#f1e6ca',
-    });
+    const panel = document.createElement('section');
+    panel.className = 'dialogue-panel';
 
-    const body = this.scene.add.text(-width / 2 + 20, -height / 2 + 48, options.text, {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: this.scene.scale.width < 600 ? '13px' : '14px',
-      color: '#e2ecef',
-      lineSpacing: 5,
-      wordWrap: { width: width - 40 },
-    });
+    const header = document.createElement('div');
+    header.className = 'dialogue-speaker';
+    header.textContent = options.speaker.toUpperCase();
 
-    const items: Phaser.GameObjects.GameObject[] = [bg, speaker, body];
-    const startY = height / 2 - choices.length * choiceHeight - 12;
+    const body = document.createElement('div');
+    body.className = 'dialogue-body';
+    body.textContent = options.text;
 
-    choices.forEach((choice, index) => {
-      const button = this.scene.add.text(
-        -width / 2 + 20,
-        startY + index * choiceHeight,
-        choice.label,
-        {
-          fontFamily: 'system-ui, sans-serif',
-          fontSize: '12px',
-          fontStyle: 'bold',
-          color: choice.disabled ? '#7b8a8f' : '#071116',
-          backgroundColor: choice.disabled ? '#253138' : '#c9d7dc',
-          padding: { x: 12, y: 8 },
-        },
-      );
+    const choiceWrap = document.createElement('div');
+    choiceWrap.className = 'dialogue-choices';
+
+    for (const choice of choices) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'dialogue-choice';
+      button.textContent = choice.label;
+      button.disabled = Boolean(choice.disabled);
 
       if (!choice.disabled) {
-        button.setInteractive({ useHandCursor: true });
-        button.on('pointerdown', () => {
+        button.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
           this.close();
           choice.run();
         });
       }
-      items.push(button);
-    });
+
+      choiceWrap.append(button);
+    }
+
+    panel.append(header, body, choiceWrap);
+    overlay.append(panel);
+
+    const absorb = (event: Event) => event.stopPropagation();
+    overlay.addEventListener('pointerdown', absorb);
+    overlay.addEventListener('pointermove', absorb);
+    overlay.addEventListener('pointerup', absorb);
+    overlay.addEventListener('click', absorb);
 
     this.closeHandler = options.onClose;
-    this.root = this.scene.add.container(
-      this.scene.scale.width / 2,
-      this.scene.scale.height - height / 2 - 14,
-      items,
-    ).setScrollFactor(0).setDepth(3600);
+    this.root = overlay;
+    document.body.append(overlay);
 
+    const firstEnabled = choiceWrap.querySelector<HTMLButtonElement>('button:not(:disabled)');
+    firstEnabled?.focus({ preventScroll: true });
   }
 
   close(invokeHandler = true): void {
     if (!this.root) return;
-    this.root.destroy(true);
+
+    this.root.remove();
     this.root = null;
 
     const handler = this.closeHandler;
     this.closeHandler = undefined;
     if (invokeHandler) handler?.();
-  }
-
-  private onResize(size: Phaser.Structs.Size): void {
-    if (!this.root) return;
-    const bounds = this.root.getBounds();
-    this.root.setPosition(size.width / 2, size.height - bounds.height / 2 - 14);
   }
 }
