@@ -32,8 +32,11 @@ export class BootScene extends Phaser.Scene {
   private makeCharacter(key: string, skin: number, cloth: number, accent: number, role: string): void {
     const g = this.add.graphics();
     g.fillStyle(0x0a0b0d, 0.25).fillEllipse(36, 98, 45, 10);
-    g.fillStyle(0x27231f, 1).fillRoundedRect(19, 75, 14, 23, 4).fillRoundedRect(39, 75, 14, 23, 4);
-    g.fillStyle(cloth, 1).fillRoundedRect(15, 45, 42, 37, 8);
+    const bodyX = role === 'fighter' ? 10 : role === 'navigator' ? 18 : 15;
+    const bodyW = role === 'fighter' ? 52 : role === 'navigator' ? 36 : 42;
+    const legW = role === 'fighter' ? 16 : 14;
+    g.fillStyle(0x27231f, 1).fillRoundedRect(19, 75, legW, 23, 4).fillRoundedRect(53 - legW, 75, legW, 23, 4);
+    g.fillStyle(cloth, 1).fillRoundedRect(bodyX, 45, bodyW, 37, 8);
     g.fillStyle(accent, 1).fillRect(18, 65, 36, 7);
     g.fillStyle(skin, 1).fillCircle(36, 32, 14);
     g.fillRoundedRect(7, 48, 12, 28, 5).fillRoundedRect(53, 48, 12, 28, 5);
@@ -43,10 +46,13 @@ export class BootScene extends Phaser.Scene {
       g.lineStyle(3, 0xd8b45f, 1).strokeEllipse(36, 23, 41, 19);
       g.fillStyle(0x8e2430, 1).fillTriangle(15, 52, 3, 90, 27, 78).fillTriangle(57, 52, 69, 90, 45, 78);
     } else if (role === 'navigator') {
-      g.fillStyle(0x27374b, 1).fillEllipse(36, 23, 34, 20);
+      g.fillStyle(0x3a241f, 1).fillEllipse(36, 22, 38, 24);
+      g.fillRoundedRect(19, 22, 8, 27, 4).fillRoundedRect(46, 22, 8, 27, 4);
+      g.fillStyle(0x27374b, 1).fillEllipse(36, 20, 31, 13);
       g.lineStyle(3, 0xd2b274, 1).strokeCircle(60, 57, 8);
     } else if (role === 'fighter') {
-      g.fillStyle(0x17191b, 1).fillEllipse(36, 23, 36, 18);
+      g.fillStyle(0x17191b, 1).fillEllipse(36, 23, 40, 19);
+      g.fillStyle(0x9d6b4b, 1).fillRoundedRect(10, 47, 9, 31, 4).fillRoundedRect(53, 47, 9, 31, 4);
       g.lineStyle(4, 0xbfc6ca, 1);
       g.beginPath().moveTo(10, 60).lineTo(1, 78).lineTo(8, 88).strokePath();
       g.beginPath().moveTo(62, 60).lineTo(71, 78).lineTo(64, 88).strokePath();

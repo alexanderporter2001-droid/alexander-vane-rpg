@@ -61,6 +61,7 @@ export class GullrockScene extends Phaser.Scene {
     this.registerInteractions();
     this.createHud();
     this.crewHud = new CrewStatusHud(this);
+    this.crewHud.setVisible(false);
 
     if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {

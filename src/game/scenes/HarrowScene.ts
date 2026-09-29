@@ -3,6 +3,7 @@ import { SaveManager } from '../state/SaveManager';
 import type { CaptainOrder } from '../state/types';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { equippedEffects } from '../systems/Equipment';
+import { fruitStats, recordCombatExperience, recordFruitUse } from '../systems/Progression';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
@@ -57,6 +58,7 @@ export class HarrowScene extends Phaser.Scene {
   private lastValid = new Phaser.Math.Vector2(720, 870);
   private dead = false;
   private lastSaveAt = 0;
+  private damageGraceUntil = 0;
 
   constructor() { super('HarrowScene'); }
 
@@ -137,7 +139,7 @@ export class HarrowScene extends Phaser.Scene {
       const bullet = raw as Phaser.Physics.Arcade.Image;
       if (!bullet.active) return;
       bullet.disableBody(true, true);
-      this.damagePlayer(12);
+      this.damagePlayer(9);
     });
     for (const unit of this.crew) {
       this.physics.add.overlap(unit.sprite, this.bullets, (_p, raw) => {
@@ -292,6 +294,7 @@ export class HarrowScene extends Phaser.Scene {
         ]);
     const alerted = this.enemies.filter((e) => e.alert && e.hp > 0).length;
     this.status.setText(`Harrow Docks\n${formatWorldTime(save)}${alerted ? `\n${alerted} alerted` : ''}`);
+    this.crewHud.setVisible(alerted > 0);
     this.crewHud.update(this.crew.map((unit) => {
       const state = save.crew.find((member) => member.id === unit.id);
       return {
@@ -394,7 +397,7 @@ export class HarrowScene extends Phaser.Scene {
       arc.destroy();
       if (enemy.hp <= 0 || this.dead) return;
       const d = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, this.player.x, this.player.y);
-      if (d <= 62 && this.time.now >= this.dashUntil) this.damagePlayer(15);
+      if (d <= 62 && this.time.now >= this.dashUntil) this.damagePlayer(11);
     });
   }
 
@@ -551,11 +554,12 @@ export class HarrowScene extends Phaser.Scene {
 
   private pull(): void {
     const save = SaveManager.get();
-    if (this.dead || this.time.now < this.pullReadyAt || save.player.stamina < 12) return;
+    const fruit = fruitStats(save);
+    if (this.dead || this.time.now < this.pullReadyAt || save.player.stamina < fruit.staminaCost) return;
 
     this.pullReadyAt = this.time.now + 560;
-    save.player.stamina -= 12;
-    const range = save.player.fruit.range;
+    save.player.stamina -= fruit.staminaCost;
+    const range = fruit.range;
     let affected = 0;
 
     const pulse = this.add.circle(this.player.x, this.player.y, 24, 0x79bfd3, 0)
@@ -571,8 +575,8 @@ export class HarrowScene extends Phaser.Scene {
       const resistance = enemy.role === 'melee' ? 0.86 : 1;
       this.setWalkableVelocity(
         enemy.sprite,
-        n.x * save.player.fruit.force * resistance,
-        n.y * save.player.fruit.force * resistance,
+        n.x * fruit.force * resistance,
+        n.y * fruit.force * resistance,
         0.08,
       );
       enemy.alert = true;
@@ -584,11 +588,11 @@ export class HarrowScene extends Phaser.Scene {
       if (d > range) continue;
       const mass = Number(prop.getData('mass') ?? 1);
       const n = new Phaser.Math.Vector2(this.player.x - prop.x, this.player.y - prop.y).normalize();
-      prop.setVelocity(n.x * save.player.fruit.force / mass, n.y * save.player.fruit.force / mass);
+      prop.setVelocity(n.x * fruit.force / mass, n.y * fruit.force / mass);
       affected += 1;
     }
 
-    save.player.fruit.mastery = Math.min(1, save.player.fruit.mastery + Math.max(1, affected) * 0.0005);
+    recordFruitUse(save, affected);
     if (affected === 0) this.toast.show('The force catches nothing useful.');
   }
 
@@ -666,6 +670,8 @@ export class HarrowScene extends Phaser.Scene {
   }
 
   private damagePlayer(amount: number): void {
+    if (this.time.now < this.damageGraceUntil) return;
+    this.damageGraceUntil = this.time.now + 240;
     const save = SaveManager.get();
     const reduction = equippedEffects(save.player.equipment).damageReduction;
     save.player.hp = Math.max(0, save.player.hp - Math.max(1, amount - reduction));

@@ -68,6 +68,12 @@ function normalizeCrew(raw: unknown, fallback?: CrewState): CrewState | null {
       ? raw.capabilities.filter((value): value is string => typeof value === 'string')
       : fallback?.capabilities ?? legacyCrewCapabilities(id),
     equipment: normalizedLoadout(raw.equipment ?? fallback?.equipment ?? emptyEquipmentLoadout()),
+    progression: isObject(raw.progression) ? {
+      experience: typeof raw.progression.experience === 'number' ? raw.progression.experience : fallback?.progression.experience ?? 0,
+      specialty: typeof raw.progression.specialty === 'number' ? raw.progression.specialty : fallback?.progression.specialty ?? 0,
+      techniques: Array.isArray(raw.progression.techniques) ? raw.progression.techniques.filter((value): value is string => typeof value === 'string') : fallback?.progression.techniques ?? [],
+    } : fallback?.progression ?? { experience: 0, specialty: 0, techniques: [] },
+    recruitedDay: typeof raw.recruitedDay === 'number' ? raw.recruitedDay : fallback?.recruitedDay ?? 1,
   };
 }
 
@@ -93,6 +99,13 @@ function normalizeCurrent(raw: Record<string, any>): CampaignSave {
       ? oldPlayer.equipmentTags.filter((value: unknown): value is string => typeof value === 'string')
       : fresh.player.equipmentTags,
     equipment: normalizedLoadout(oldPlayer.equipment ?? fresh.player.equipment),
+    progression: isObject(oldPlayer.progression) ? {
+      ...fresh.player.progression,
+      ...oldPlayer.progression,
+      techniques: Array.isArray(oldPlayer.progression.techniques)
+        ? oldPlayer.progression.techniques.filter((value: unknown): value is string => typeof value === 'string')
+        : fresh.player.progression.techniques,
+    } : fresh.player.progression,
   };
 
   const oldCrew = Array.isArray(raw.crew) ? raw.crew : [];
@@ -121,6 +134,11 @@ function normalizeCurrent(raw: Record<string, any>): CampaignSave {
       ? { ...fresh.world.flags, ...primitiveFlags(oldWorld.flags) }
       : fresh.world.flags,
     canonLedger: Array.isArray(oldWorld.canonLedger) ? oldWorld.canonLedger : fresh.world.canonLedger,
+    islands: isObject(oldWorld.islands) ? oldWorld.islands as typeof fresh.world.islands : fresh.world.islands,
+    encounters: Array.isArray(oldWorld.encounters) ? oldWorld.encounters : fresh.world.encounters,
+    knownGroups: isObject(oldWorld.knownGroups) ? oldWorld.knownGroups as typeof fresh.world.knownGroups : fresh.world.knownGroups,
+    recruitCandidates: isObject(oldWorld.recruitCandidates) ? oldWorld.recruitCandidates as typeof fresh.world.recruitCandidates : fresh.world.recruitCandidates,
+    threatHeat: typeof oldWorld.threatHeat === 'number' ? Math.max(0, oldWorld.threatHeat) : fresh.world.threatHeat,
   };
 
   fresh.saveVersion = SAVE_VERSION;
@@ -134,7 +152,7 @@ function migrate(raw: unknown): CampaignSave {
   if (!isObject(raw)) return fresh;
 
   const old = raw as Record<string, any>;
-  if (old.saveVersion === 3 || old.saveVersion === 4) {
+  if (old.saveVersion === 3 || old.saveVersion === 4 || old.saveVersion === 5) {
     return normalizeCurrent(old);
   }
 

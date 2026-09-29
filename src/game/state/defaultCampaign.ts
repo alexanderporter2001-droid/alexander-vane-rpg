@@ -1,7 +1,7 @@
 import type { CampaignSave } from './types';
 
-export const GAME_VERSION = '0.3.13';
-export const SAVE_VERSION = 4 as const;
+export const GAME_VERSION = '0.3.14';
+export const SAVE_VERSION = 5 as const;
 
 export function createDefaultCampaign(): CampaignSave {
   return {
@@ -29,6 +29,7 @@ export function createDefaultCampaign(): CampaignSave {
         force: 420,
       },
       knowledge: { hakiKnown: false },
+      progression: { combatExperience: 0, physicalConditioning: 0, fruitTechniquePoints: 0, techniques: ['focused-pull'] },
     },
     crew: [
       {
@@ -44,6 +45,8 @@ export function createDefaultCampaign(): CampaignSave {
         equipmentTags: ['navigator', 'light-armor', 'tools', 'light-weapons'],
         capabilities: ['navigation', 'helm'],
         equipment: { weapon: null, armor: null, tool: null, accessory: null },
+        progression: { experience: 0, specialty: 0.18, techniques: ['read-the-water'] },
+        recruitedDay: 1,
       },
       {
         id: 'rowan',
@@ -58,6 +61,8 @@ export function createDefaultCampaign(): CampaignSave {
         equipmentTags: ['fighter', 'chain-weapons', 'medium-armor', 'tools'],
         capabilities: ['frontline-combat'],
         equipment: { weapon: null, armor: null, tool: null, accessory: null },
+        progression: { experience: 0, specialty: 0.2, techniques: ['chain-control'] },
+        recruitedDay: 1,
       },
     ],
     ship: {
@@ -106,6 +111,14 @@ export function createDefaultCampaign(): CampaignSave {
         shipDestination: 'gullrock',
       },
       canonLedger: [],
+      islands: {
+        'harrow-island': { id: 'harrow-island', name: 'Harrow Island', seed: 1107, size: 'medium', discovered: true, population: 640, marinePresence: 0.72, piratePresence: 0.12, prosperity: 0.46, danger: 0.42, factions: ['Harrow Marines', 'Marron family'], activeSituations: ['marine-search'], resolvedSituations: [], lastSimulatedDay: 1 },
+        gullrock: { id: 'gullrock', name: 'Gullrock', seed: 2219, size: 'medium', discovered: false, population: 910, marinePresence: 0.24, piratePresence: 0.3, prosperity: 0.61, danger: 0.31, factions: ['Gullrock traders', 'Harbor authority'], activeSituations: ['north-road-thefts'], resolvedSituations: [], lastSimulatedDay: 1 },
+      },
+      encounters: [],
+      knownGroups: {},
+      recruitCandidates: {},
+      threatHeat: 0,
     },
   };
 }

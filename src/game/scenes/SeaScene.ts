@@ -109,6 +109,7 @@ export class SeaScene extends Phaser.Scene {
     this.dialogue = new DialoguePanel(this);
     this.createHud();
     this.crewHud = new CrewStatusHud(this);
+    this.crewHud.setVisible(false);
 
     if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {
