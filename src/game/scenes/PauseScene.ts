@@ -2,9 +2,18 @@ import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
 import { routeCampaign } from '../state/SceneRouter';
 import { formatWorldTime } from '../systems/WorldClock';
+import {
+  EQUIPMENT,
+  availableEquipmentCount,
+  equipItem,
+  equipmentDefinition,
+  isCompatible,
+  unequipSlot,
+} from '../systems/Equipment';
+import type { EquipmentLoadout, EquipmentSlot } from '../state/types';
 
 interface PauseData { source: string }
-type Tab = 'overview' | 'journal' | 'save';
+type Tab = 'overview' | 'gear' | 'journal' | 'save';
 
 export class PauseScene extends Phaser.Scene {
   private source = 'HarrowScene';
@@ -14,6 +23,7 @@ export class PauseScene extends Phaser.Scene {
   private panelW = 720;
   private panelH = 620;
   private saveButtons: Phaser.GameObjects.Text[] = [];
+  private gearWearerIndex = 0;
 
   constructor() { super('PauseScene'); }
 
@@ -40,8 +50,9 @@ export class PauseScene extends Phaser.Scene {
 
     const tabs = [
       this.makeTab('OVERVIEW', -this.panelW / 2 + 24, -this.panelH / 2 + 68, 'overview'),
-      this.makeTab('JOURNAL', -this.panelW / 2 + 126, -this.panelH / 2 + 68, 'journal'),
-      this.makeTab('SAVE', -this.panelW / 2 + 218, -this.panelH / 2 + 68, 'save'),
+      this.makeTab('GEAR', -this.panelW / 2 + 126, -this.panelH / 2 + 68, 'gear'),
+      this.makeTab('JOURNAL', -this.panelW / 2 + 194, -this.panelH / 2 + 68, 'journal'),
+      this.makeTab('SAVE', -this.panelW / 2 + 286, -this.panelH / 2 + 68, 'save'),
     ];
 
     this.content = this.add.text(-this.panelW / 2 + 24, -this.panelH / 2 + 118, '', {
@@ -83,6 +94,7 @@ export class PauseScene extends Phaser.Scene {
   private renderTab(): void {
     this.clearSaveButtons();
     if (this.tab === 'overview') this.renderOverview();
+    else if (this.tab === 'gear') this.renderGear();
     else if (this.tab === 'journal') this.renderJournal();
     else this.renderSaveTools();
   }
@@ -125,6 +137,106 @@ export class PauseScene extends Phaser.Scene {
       'INVENTORY',
       inventory || 'Empty',
     ].join('\n'));
+  }
+
+  private loadoutLines(loadout: EquipmentLoadout): string[] {
+    const slots: EquipmentSlot[] = ['weapon', 'armor', 'tool', 'accessory'];
+    return slots.map((slot) => {
+      const item = equipmentDefinition(loadout[slot]);
+      return `${slot.toUpperCase()}: ${item?.name ?? '—'}`;
+    });
+  }
+
+  private renderGear(): void {
+    const save = SaveManager.get();
+    const wearers = [
+      {
+        id: 'alexander',
+        name: 'Alexander Vane',
+        tags: save.player.equipmentTags,
+        loadout: save.player.equipment,
+      },
+      ...save.crew.map((member) => ({
+        id: member.id,
+        name: member.name,
+        tags: member.equipmentTags,
+        loadout: member.equipment,
+      })),
+    ];
+
+    if (!wearers.length) return;
+    this.gearWearerIndex = Phaser.Math.Wrap(this.gearWearerIndex, 0, wearers.length);
+    const wearer = wearers[this.gearWearerIndex]!;
+
+    const owned = Object.entries(save.equipmentInventory)
+      .filter(([, count]) => count > 0)
+      .map(([itemId, count]) => {
+        const item = EQUIPMENT[itemId];
+        if (!item) return null;
+        const fits = isCompatible(item, wearer.tags);
+        const free = availableEquipmentCount(save, itemId);
+        return `${item.name} ×${count} · ${fits ? 'compatible' : 'not compatible'} · ${free} free`;
+      })
+      .filter((line): line is string => Boolean(line));
+
+    this.content.setText([
+      `BERRIES  ${save.player.berries.toLocaleString()}`,
+      '',
+      `SELECTED: ${wearer.name}  (${this.gearWearerIndex + 1}/${wearers.length})`,
+      `Compatibility: ${wearer.tags.join(', ')}`,
+      '',
+      ...this.loadoutLines(wearer.loadout),
+      '',
+      'OWNED EQUIPMENT',
+      owned.length ? owned.join('\n') : 'No equipment purchased yet. Maris sells gear at Gullrock.',
+      '',
+      'Use the buttons below to change wearer or equip compatible owned gear.',
+    ].join('\n'));
+
+    const prev = this.makeButton('◀ PERSON', 0, 0, () => {
+      this.gearWearerIndex = Phaser.Math.Wrap(this.gearWearerIndex - 1, 0, wearers.length);
+      this.renderTab();
+    }, true);
+    const next = this.makeButton('PERSON ▶', 0, 0, () => {
+      this.gearWearerIndex = Phaser.Math.Wrap(this.gearWearerIndex + 1, 0, wearers.length);
+      this.renderTab();
+    }, true);
+    prev.setPosition(-this.panelW / 2 + 24, this.panelH / 2 - 154);
+    next.setPosition(-this.panelW / 2 + 124, this.panelH / 2 - 154);
+    this.panel.add([prev, next]);
+    this.saveButtons.push(prev, next);
+
+    const ownedIds = Object.keys(save.equipmentInventory).filter((itemId) => (save.equipmentInventory[itemId] ?? 0) > 0);
+    let buttonIndex = 0;
+    for (const itemId of ownedIds) {
+      const item = EQUIPMENT[itemId];
+      if (!item || !isCompatible(item, wearer.tags)) continue;
+
+      const equippedHere = wearer.loadout[item.slot] === itemId;
+      const available = availableEquipmentCount(save, itemId);
+      if (!equippedHere && available <= 0) continue;
+
+      const label = equippedHere ? `UNEQUIP ${item.name}` : `EQUIP ${item.name}`;
+      const button = this.makeButton(label, 0, 0, () => {
+        if (equippedHere) {
+          unequipSlot(save, wearer.id, item.slot);
+        } else {
+          equipItem(save, wearer.id, itemId);
+        }
+        SaveManager.save();
+        this.renderTab();
+      }, equippedHere);
+
+      const column = buttonIndex % 2;
+      const row = Math.floor(buttonIndex / 2);
+      button.setPosition(
+        -this.panelW / 2 + 24 + column * Math.min(300, this.panelW * 0.46),
+        this.panelH / 2 - 108 + row * 38,
+      );
+      this.panel.add(button);
+      this.saveButtons.push(button);
+      buttonIndex += 1;
+    }
   }
 
   private renderJournal(): void {
