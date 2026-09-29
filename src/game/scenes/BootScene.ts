@@ -12,6 +12,8 @@ export class BootScene extends Phaser.Scene {
     this.makeCharacter('alexander', 0xd8b45f, 0x1d3445, 0x8e2430, 'captain');
     this.makeCharacter('sera', 0xc98e66, 0x315b72, 0xa13d52, 'navigator');
     this.makeCharacter('rowan', 0x9d6b4b, 0x2c3135, 0x9c3838, 'fighter');
+    this.makeCharacter('crew-medic', 0xb98263, 0x49616d, 0xd7e1d0, 'medic');
+    this.makeCharacter('crew-specialist', 0xa7775c, 0x4b5660, 0xb58b56, 'specialist');
     this.makeCharacter('marine', 0xd9b38c, 0xe6eef1, 0x315f8d, 'marine');
     this.makeCharacter('npc-tavern', 0xb87958, 0x6f3c2d, 0xd6aa55, 'tavern');
     this.makeCharacter('npc-harbor', 0xb99162, 0x314c5a, 0xc49c5f, 'harbor');
@@ -56,6 +58,16 @@ export class BootScene extends Phaser.Scene {
       g.lineStyle(4, 0xbfc6ca, 1);
       g.beginPath().moveTo(10, 60).lineTo(1, 78).lineTo(8, 88).strokePath();
       g.beginPath().moveTo(62, 60).lineTo(71, 78).lineTo(64, 88).strokePath();
+    } else if (role === 'medic') {
+      g.fillStyle(0x3c2a25, 1).fillEllipse(36, 22, 34, 20);
+      g.fillStyle(0x3c2a25, 1).fillRoundedRect(49, 22, 7, 28, 3);
+      g.fillStyle(0xe7efe5, 1).fillRoundedRect(18, 48, 36, 31, 6);
+      g.fillStyle(0xa64545, 1).fillRect(33, 54, 6, 18).fillRect(27, 60, 18, 6);
+      g.fillStyle(0x6d4936, 1).fillRoundedRect(51, 57, 13, 22, 3);
+    } else if (role === 'specialist') {
+      g.fillStyle(0x2b2421, 1).fillEllipse(36, 22, 35, 18);
+      g.fillStyle(0xb58b56, 1).fillRoundedRect(13, 53, 10, 28, 3);
+      g.lineStyle(3, 0xc9d4d7, 1).strokeCircle(58, 60, 7);
     } else if (role === 'marine') {
       g.fillStyle(0xf6f8f9, 1).fillEllipse(36, 21, 38, 15);
       g.fillStyle(0x315f8d, 1).fillRect(17, 25, 38, 6);
