@@ -1290,7 +1290,6 @@ export class SeaScene extends Phaser.Scene {
     this.nav.setText([
       this.navTarget.name,
       this.formatEta(this.estimateTravelMinutes(this.navTarget)) + ' ETA · ' + bearing,
-      formatWorldTime(save),
       this.shipArea === 'deck' ? 'Main deck' : this.shipAreaLabel(),
     ]);
 
