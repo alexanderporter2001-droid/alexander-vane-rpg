@@ -4,7 +4,7 @@ A private, persistent, consequence-driven pirate RPG built around Alexander Vane
 
 This repository replaces the Floot prototype as the permanent source of truth. Hosting is replaceable; campaign continuity and versioned saves are not.
 
-## Current foundation — v0.3.5
+## Current foundation — v0.3.6
 
 The current vertical slice is built as a complete local loop rather than disconnected demos:
 
@@ -24,7 +24,9 @@ The current vertical slice is built as a complete local loop rather than disconn
 14. Mobile controls are native browser controls layered above the game canvas, with iPhone safe-area support and independent pointer handling. Harrow AI respects shoreline boundaries; Sera and Rowan are labeled in-world.
 15. Dialogue is a native responsive overlay with scrollable text and choices so small phone screens cannot hide conversation content behind the HUD.
 16. Mobile movement now uses a floating joystick that centers under the thumb, combat buttons are spaced for portrait play, melee keeps facing/assists nearby targets, transient messages sit below the HUD, and defeated characters visibly fall with DOWN markers.
-16. Status messages no longer overlap the HUD; touch combat has hold-to-attack, last-facing memory, nearby-enemy aim assistance, a simplified right-thumb layout, and obvious DOWN states for defeated characters.
+17. Status messages no longer overlap the HUD; touch combat has hold-to-attack, last-facing memory, nearby-enemy aim assistance, a simplified right-thumb layout, and obvious DOWN states for defeated characters.
+18. Sera can take the helm and navigate the real sea route while Alexander walks around a close-up Wayward Gull deck. Alexander can retake the helm at any time, and Sera routes around the known reef rather than driving straight through it.
+19. Sera and Rowan now have persistent visible HP bars across Harrow, Gullrock, and sea travel, including an explicit DOWN state at zero HP.
 
 The old fake freeform-intent control is intentionally absent. It returns only when typed intent can resolve into real dialogue, orders, or world actions.
 
