@@ -171,6 +171,9 @@ export function resolveDialogueIntent(
   }
 
   if (speaker === 'harbor-master') {
+    if (includesAny(text, ['your name', 'who are you', 'name?'])) {
+      return { reply: '“Dren Pike. Harbor master. If it floats into Gullrock, eventually somebody puts it in my ledger.”' };
+    }
     if (includesAny(text, ['fee', 'berth', 'dock', 'docking', 'pay'])) {
       const paidUntil = Number(save.world.flags.gullrockDockFeeUntilDay ?? 0);
       return {
@@ -196,6 +199,9 @@ export function resolveDialogueIntent(
   }
 
   if (speaker === 'tavern-keeper') {
+    if (includesAny(text, ['your name', 'who are you', 'name?'])) {
+      return { reply: '“Marta Vell. I own the Salt Cup, which means I hear more than I want to and repeat less than people think.”' };
+    }
     if (includesAny(text, ['voss', 'iron nail', 'bounty hunter'])) {
       return {
         reply: '“A bounty-hunter crew asked about Derrick Voss. They had his face, not yours. That is all I know.”',
@@ -216,6 +222,9 @@ export function resolveDialogueIntent(
   }
 
   if (speaker === 'provisioner') {
+    if (includesAny(text, ['your name', 'who are you', 'name?'])) {
+      return { reply: '“Toma Reed. If your crew eats it, drinks it, burns it, ties it down, or patches something with it, I probably stock it.”' };
+    }
     if (includesAny(text, ['supply', 'supplies', 'ration', 'water', 'food', 'buy', 'price'])) {
       return {
         reply: `“Voyage pack is nine hundred berries. The Gull is carrying about ${Math.floor(save.ship.supplies)} percent of her supply capacity right now.”`,
@@ -230,6 +239,9 @@ export function resolveDialogueIntent(
   }
 
   if (speaker === 'shipwright') {
+    if (includesAny(text, ['your name', 'who are you', 'name?'])) {
+      return { reply: '“Brann Cale. I build ships, repair mistakes, and charge differently depending on which one you brought me.”' };
+    }
     if (includesAny(text, ['repair', 'fix', 'hull', 'damage', 'ship', 'gull'])) {
       const missing = Math.max(0, Math.ceil(save.ship.maxHull - save.ship.hull));
       if (missing <= 0) return { reply: '“The Gull is sound right now. Do not pay me to replace wood that still works.”' };
