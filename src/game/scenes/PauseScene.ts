@@ -13,6 +13,7 @@ export class PauseScene extends Phaser.Scene {
   private tab: Tab = 'overview';
   private panelW = 720;
   private panelH = 620;
+  private saveButtons: Phaser.GameObjects.Text[] = [];
 
   constructor() { super('PauseScene'); }
 
@@ -80,6 +81,7 @@ export class PauseScene extends Phaser.Scene {
   }
 
   private renderTab(): void {
+    this.clearSaveButtons();
     if (this.tab === 'overview') this.renderOverview();
     else if (this.tab === 'journal') this.renderJournal();
     else this.renderSaveTools();
@@ -154,11 +156,12 @@ export class PauseScene extends Phaser.Scene {
     exportButton.setPosition(-this.panelW / 2 + 24, this.panelH / 2 - 102);
     importButton.setPosition(-this.panelW / 2 + 162, this.panelH / 2 - 102);
     this.panel.add([exportButton, importButton]);
+    this.saveButtons = [exportButton, importButton];
+  }
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      exportButton.destroy();
-      importButton.destroy();
-    });
+  private clearSaveButtons(): void {
+    for (const button of this.saveButtons) button.destroy();
+    this.saveButtons = [];
   }
 
   private makeButton(label: string, x: number, y: number, run: () => void, secondary = false): Phaser.GameObjects.Text {
