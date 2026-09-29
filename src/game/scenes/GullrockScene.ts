@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
 import { DialoguePanel, type DialogueChoice } from '../systems/DialoguePanel';
+import { resolveDialogueIntent, type DialogueSpeakerId } from '../systems/DialogueIntent';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
@@ -55,7 +56,7 @@ export class GullrockScene extends Phaser.Scene {
     this.interactions = new InteractionSystem(this.player);
     this.registerInteractions();
     this.createHud();
-    this.crewHud = new CrewStatusHud(this, 14, 112);
+    this.crewHud = new CrewStatusHud(this);
 
     if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {
@@ -199,6 +200,27 @@ export class GullrockScene extends Phaser.Scene {
   }
 
   private registerInteractions(): void {
+    const sera = () => this.crew[0];
+    const rowan = () => this.crew[1];
+
+    this.interactions.register({
+      id: 'sera',
+      x: () => sera()?.x ?? -9999,
+      y: () => sera()?.y ?? -9999,
+      radius: 78,
+      label: 'Talk Sera',
+      enabled: () => (SaveManager.get().crew.find((member) => member.id === 'sera')?.hp ?? 0) > 0,
+      run: () => this.crewConversation('sera'),
+    });
+    this.interactions.register({
+      id: 'rowan',
+      x: () => rowan()?.x ?? -9999,
+      y: () => rowan()?.y ?? -9999,
+      radius: 78,
+      label: 'Talk Rowan',
+      enabled: () => (SaveManager.get().crew.find((member) => member.id === 'rowan')?.hp ?? 0) > 0,
+      run: () => this.crewConversation('rowan'),
+    });
     this.interactions.register({
       id: 'harbor-master',
       x: 575,
@@ -255,15 +277,61 @@ export class GullrockScene extends Phaser.Scene {
     for (const member of this.crew) member.setVelocity(0, 0);
     this.mobile?.setVisible(false);
 
+    const intentSpeaker = this.intentSpeakerFor(speaker);
     this.dialogue.show({
       speaker,
       text,
       choices,
+      freeform: intentSpeaker
+        ? {
+            placeholder: `Say anything to ${speaker}...`,
+            onSubmit: (message) => {
+              const save = SaveManager.get();
+              advanceWorldMinutes(save, 1);
+              save.world.flags[`talkedTo-${intentSpeaker}`] = true;
+              const result = resolveDialogueIntent(intentSpeaker, message, save);
+              SaveManager.save();
+              return result.reply;
+            },
+          }
+        : undefined,
       onClose: () => {
         this.mobile?.setVisible(true);
         SaveManager.save();
       },
     });
+  }
+
+  private intentSpeakerFor(speaker: string): DialogueSpeakerId | null {
+    const normalized = speaker.toLowerCase();
+    if (normalized.includes('sera')) return 'sera';
+    if (normalized.includes('rowan')) return 'rowan';
+    if (normalized.includes('harbor master')) return 'harbor-master';
+    if (normalized.includes('tavern keeper')) return 'tavern-keeper';
+    if (normalized.includes('provisioner')) return 'provisioner';
+    if (normalized.includes('shipwright')) return 'shipwright';
+    return null;
+  }
+
+  private crewConversation(id: 'sera' | 'rowan'): void {
+    const save = SaveManager.get();
+    const state = save.crew.find((member) => member.id === id);
+    if (!state || state.hp <= 0) return;
+
+    if (id === 'sera') {
+      this.openDialogue(
+        'Sera Quill',
+        `Sera turns toward you, keeping one eye on the harbor. “What do you need?”`,
+        [{ label: 'End conversation', run: () => undefined }],
+      );
+      return;
+    }
+
+    this.openDialogue(
+      'Rowan Vale',
+      'Rowan rests one chain hook against his shoulder and looks over. “Yeah?”',
+      [{ label: 'End conversation', run: () => undefined }],
+    );
   }
 
   private harborMaster(): void {
@@ -664,59 +732,149 @@ export class GullrockScene extends Phaser.Scene {
 
   private drawPort(): void {
     const g = this.add.graphics();
-    g.fillStyle(0x164150, 1).fillRect(0, 0, this.worldW, this.worldH);
 
-    g.lineStyle(2, 0x9ed4df, 0.12);
+    // Water and shoreline
+    g.fillStyle(0x123d50, 1).fillRect(0, 0, this.worldW, this.worldH);
+    g.fillStyle(0x1b5265, 0.7).fillRect(0, 560, this.worldW, 420);
+
+    g.lineStyle(2, 0x9ed4df, 0.10);
     for (let y = 30; y < this.worldH; y += 58) {
       for (let x = 0; x < this.worldW; x += 120) {
         g.beginPath();
         g.moveTo(x, y);
-        g.lineTo(x + 60, y);
-        g.lineTo(x + 120, y);
+        g.lineTo(x + 38, y - 4);
+        g.lineTo(x + 76, y + 2);
         g.strokePath();
       }
     }
 
-    g.fillStyle(0x66503a, 1).fillRect(500, 650, 450, 330);
-    g.fillStyle(0x9b895d, 1).fillRect(320, 310, 860, 420);
-    g.fillStyle(0x747c50, 1).fillRect(210, 120, 1080, 280);
+    // Main quay, market stone, and upper town.
+    g.fillStyle(0x66503a, 1).fillRoundedRect(500, 650, 450, 330, 8);
+    g.fillStyle(0x9b895d, 1).fillRoundedRect(320, 310, 860, 420, 10);
+    g.fillStyle(0x747c50, 1).fillRoundedRect(210, 120, 1080, 280, 14);
 
-    const buildings: Array<[number, number, number, number, number]> = [
-      [260, 135, 220, 160, 0x4b302b],
-      [530, 135, 230, 155, 0x523b30],
-      [810, 145, 210, 150, 0x4a3933],
-      [1060, 140, 200, 160, 0x3f4540],
-    ];
-    for (const [x, y, w, h, color] of buildings) {
-      g.fillStyle(color, 1).fillRoundedRect(x, y, w, h, 8);
-      g.fillStyle(0xd3a65c, 0.75).fillRect(x + 25, y + 52, 28, 38);
+    // Pier planks and rope posts.
+    g.lineStyle(3, 0x3f2d20, 0.65);
+    for (let y = 675; y < 970; y += 42) g.lineBetween(515, y, 935, y);
+    for (let x = 520; x <= 930; x += 82) {
+      g.fillStyle(0x3b2a1e, 1).fillRoundedRect(x, 650, 10, 44, 4);
+      g.fillStyle(0xb99a6d, 0.75).fillCircle(x + 5, 651, 5);
     }
 
-    this.add.text(370, 180, 'TAVERN', {
+    // Market walkways and patches of grass.
+    g.lineStyle(3, 0x6f6146, 0.45);
+    for (let x = 360; x <= 1130; x += 95) g.lineBetween(x, 325, x, 715);
+    g.fillStyle(0x5c6e43, 0.75).fillCircle(265, 330, 54);
+    g.fillCircle(1240, 330, 62);
+    g.fillCircle(860, 185, 42);
+
+    const buildings: Array<[number, number, number, number, number, number]> = [
+      [250, 135, 230, 165, 0x4b302b, 0x7e4b35],
+      [520, 135, 240, 158, 0x523b30, 0x85573c],
+      [805, 142, 220, 154, 0x4a3933, 0x715042],
+      [1050, 137, 215, 165, 0x3f4540, 0x59645e],
+    ];
+
+    for (const [x, y, w, h, wall, roof] of buildings) {
+      g.fillStyle(0x19130f, 0.30).fillRoundedRect(x + 8, y + 10, w, h, 10);
+      g.fillStyle(wall, 1).fillRoundedRect(x, y, w, h, 9);
+      g.fillStyle(roof, 1).fillTriangle(x - 12, y + 18, x + w / 2, y - 26, x + w + 12, y + 18);
+      g.fillStyle(0x2a211d, 1).fillRoundedRect(x + w / 2 - 18, y + h - 54, 36, 54, 5);
+      for (const wx of [x + 32, x + w - 62]) {
+        g.fillStyle(0xd3a65c, 0.82).fillRoundedRect(wx, y + 54, 30, 38, 4);
+        g.fillStyle(0x30434a, 0.35).fillRect(wx + 4, y + 58, 22, 30);
+      }
+    }
+
+    // Market stalls and cargo make the port feel occupied.
+    const stalls: Array<[number, number, number]> = [
+      [470, 420, 0xb65e4a],
+      [700, 455, 0xd09a4e],
+      [880, 410, 0x557b72],
+      [1040, 410, 0x8b5e8a],
+    ];
+    for (const [x, y, canopy] of stalls) {
+      g.fillStyle(0x6d4a2f, 1).fillRoundedRect(x - 36, y, 72, 38, 5);
+      g.fillStyle(canopy, 1).fillTriangle(x - 48, y + 2, x, y - 28, x + 48, y + 2);
+      g.lineStyle(3, 0x3b2b21, 0.8).lineBetween(x - 28, y + 35, x - 28, y + 70);
+      g.lineBetween(x + 28, y + 35, x + 28, y + 70);
+    }
+
+    // Lamps, barrels, crates, and a little dock clutter.
+    const lamps: Array<[number, number]> = [[350, 625], [1165, 625], [550, 735], [900, 735]];
+    for (const [x, y] of lamps) {
+      g.fillStyle(0x2f2d2a, 1).fillRect(x - 3, y - 42, 6, 42);
+      g.fillStyle(0xf2c76a, 0.82).fillCircle(x, y - 48, 7);
+      g.fillStyle(0xf2c76a, 0.10).fillCircle(x, y - 48, 24);
+    }
+
+    for (const [x, y] of [[430, 665], [470, 690], [1010, 690], [1070, 705]] as Array<[number, number]>) {
+      this.add.image(x, y, 'crate').setScale(0.72).setDepth(18);
+    }
+    for (const [x, y] of [[600, 610], [900, 575], [1180, 350]] as Array<[number, number]>) {
+      this.add.image(x, y, 'barrel').setScale(0.72).setDepth(18);
+    }
+
+    this.add.text(365, 180, 'THE SALT CUP', {
       fontFamily: 'Georgia, serif',
       fontSize: '13px',
       color: '#ead7b5',
+      backgroundColor: '#2a1714aa',
+      padding: { x: 7, y: 4 },
     }).setOrigin(0.5).setDepth(26);
     this.add.text(1160, 185, 'SHIPWRIGHT', {
       fontFamily: 'Georgia, serif',
       fontSize: '13px',
       color: '#d7e1df',
+      backgroundColor: '#1b2221aa',
+      padding: { x: 7, y: 4 },
     }).setOrigin(0.5).setDepth(26);
 
-    this.add.circle(405, 500, 24, 0xa66d54, 1).setDepth(25);
-    this.add.text(405, 460, 'Tavern Keeper', { fontSize: '12px', color: '#f0f4f5' }).setOrigin(0.5).setDepth(26);
+    const npc = (
+      x: number,
+      y: number,
+      texture: string,
+      label: string,
+      labelColor = '#f0f4f5',
+    ) => {
+      this.add.image(x, y, texture).setScale(0.62).setDepth(25);
+      this.add.text(x, y - 58, label, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: labelColor,
+        backgroundColor: '#071116c7',
+        padding: { x: 5, y: 3 },
+      }).setOrigin(0.5, 1).setDepth(26);
+    };
 
-    this.add.circle(575, 560, 24, 0xb99162, 1).setDepth(25);
-    this.add.text(575, 520, 'Harbor Master', { fontSize: '12px', color: '#f0f4f5' }).setOrigin(0.5).setDepth(26);
+    npc(405, 500, 'npc-tavern', 'Tavern Keeper', '#f2d8bd');
+    npc(575, 560, 'npc-harbor', 'Harbor Master', '#d9e8ed');
+    npc(955, 500, 'npc-provisioner', 'Provisioner', '#dce6c8');
+    npc(1120, 540, 'npc-shipwright', 'Shipwright', '#e2d4c8');
 
-    this.add.circle(955, 500, 24, 0x7ebc85, 1).setDepth(25);
-    this.add.text(955, 460, 'Provisioner', { fontSize: '12px', color: '#f0f4f5' }).setOrigin(0.5).setDepth(26);
+    // Non-interactive locals so the port does not feel like four quest markers in an empty square.
+    npc(660, 385, 'npc-sailor', 'Sailor', '#c9d8dc');
+    npc(770, 600, 'npc-dockhand', 'Dockhand', '#c9d8dc');
+    npc(1085, 355, 'npc-sailor', 'Coastal Trader', '#c9d8dc');
+    npc(520, 365, 'npc-dockhand', 'Porter', '#c9d8dc');
 
-    this.add.circle(1120, 540, 24, 0x8b9fa1, 1).setDepth(25);
-    this.add.text(1120, 500, 'Shipwright', { fontSize: '12px', color: '#f0f4f5' }).setOrigin(0.5).setDepth(26);
+    g.fillStyle(0x503520, 1).fillRoundedRect(755, 340, 60, 70, 5);
+    g.fillStyle(0xe1d4b3, 1).fillRect(765, 350, 40, 20);
+    g.fillStyle(0xc9b889, 1).fillRect(765, 376, 30, 18);
+    this.add.text(785, 320, 'NOTICEBOARD', {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '11px',
+      fontStyle: 'bold',
+      color: '#f0f4f5',
+      backgroundColor: '#071116aa',
+      padding: { x: 5, y: 3 },
+    }).setOrigin(0.5).setDepth(26);
 
-    g.fillStyle(0x503520, 1).fillRect(755, 340, 60, 70);
-    this.add.text(785, 320, 'Noticeboard', { fontSize: '12px', color: '#f0f4f5' }).setOrigin(0.5).setDepth(26);
+    // Moored ship and shoreline foam.
     this.add.image(725, 930, 'wayward-gull').setScale(0.72).setDepth(20);
+    g.lineStyle(4, 0xcbe3e8, 0.22);
+    g.beginPath().moveTo(510, 646).lineTo(945, 646).strokePath();
   }
+
 }
