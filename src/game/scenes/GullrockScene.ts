@@ -259,6 +259,38 @@ export class GullrockScene extends Phaser.Scene {
       run: () => this.shipwright(),
     });
     this.interactions.register({
+      id: 'elias',
+      x: 660,
+      y: 385,
+      radius: 76,
+      label: 'Talk Elias',
+      run: () => this.localConversation('elias'),
+    });
+    this.interactions.register({
+      id: 'nico',
+      x: 770,
+      y: 600,
+      radius: 76,
+      label: 'Talk Nico',
+      run: () => this.localConversation('nico'),
+    });
+    this.interactions.register({
+      id: 'maris',
+      x: 1085,
+      y: 355,
+      radius: 78,
+      label: 'Talk Maris',
+      run: () => this.localConversation('maris'),
+    });
+    this.interactions.register({
+      id: 'perrin',
+      x: 520,
+      y: 365,
+      radius: 76,
+      label: 'Talk Perrin',
+      run: () => this.localConversation('perrin'),
+    });
+    this.interactions.register({
       id: 'noticeboard',
       x: 785,
       y: 370,
@@ -295,8 +327,11 @@ export class GullrockScene extends Phaser.Scene {
               advanceWorldMinutes(save, 1);
               save.world.flags[`talkedTo-${intentSpeaker}`] = true;
               const result = await resolveDialogueAI(intentSpeaker, message, save, history);
-              if (result.action?.type === 'set_course' && intentSpeaker === 'sera') {
+              if (result.action.type === 'set_course' && intentSpeaker === 'sera') {
                 save.world.flags.shipDestination = result.action.target;
+              }
+              if (result.action.type === 'set_helm' && intentSpeaker === 'sera') {
+                save.world.flags.sailingDelegated = result.action.target === 'sera';
               }
               SaveManager.save();
               return result.reply;
@@ -318,7 +353,39 @@ export class GullrockScene extends Phaser.Scene {
     if (normalized.includes('tavern keeper')) return 'tavern-keeper';
     if (normalized.includes('provisioner')) return 'provisioner';
     if (normalized.includes('shipwright')) return 'shipwright';
+    if (normalized.includes('elias')) return 'elias';
+    if (normalized.includes('nico')) return 'nico';
+    if (normalized.includes('maris')) return 'maris';
+    if (normalized.includes('perrin')) return 'perrin';
     return null;
+  }
+
+  private localConversation(id: 'elias' | 'nico' | 'maris' | 'perrin'): void {
+    const openings: Record<typeof id, { speaker: string; text: string }> = {
+      elias: {
+        speaker: 'Elias — Sailor',
+        text: 'Elias glances from the harbor mouth back to you. “Need something?”',
+      },
+      nico: {
+        speaker: 'Nico — Dockhand',
+        text: 'Nico sets down the rope coil he was moving. “Yeah?”',
+      },
+      maris: {
+        speaker: 'Maris — Coastal Trader',
+        text: 'Maris gives you the quick measuring look of someone used to pricing risk. “What are you after?”',
+      },
+      perrin: {
+        speaker: 'Perrin — Porter',
+        text: 'Perrin braces one hand on a crate and looks over. “Got a question?”',
+      },
+    };
+
+    const opening = openings[id];
+    this.openDialogue(
+      opening.speaker,
+      opening.text,
+      [{ label: 'End conversation', run: () => undefined }],
+    );
   }
 
   private crewConversation(id: 'sera' | 'rowan'): void {
@@ -861,7 +928,7 @@ export class GullrockScene extends Phaser.Scene {
     npc(955, 500, 'npc-provisioner', 'Toma Reed — Provisioner', '#dce6c8');
     npc(1120, 540, 'npc-shipwright', 'Brann Cale — Shipwright', '#e2d4c8');
 
-    // Non-interactive locals so the port does not feel like four quest markers in an empty square.
+    // Named locals are full conversation targets rather than decorative quest-marker filler.
     npc(660, 385, 'npc-sailor', 'Elias — Sailor', '#c9d8dc');
     npc(770, 600, 'npc-dockhand', 'Nico — Dockhand', '#c9d8dc');
     npc(1085, 355, 'npc-sailor', 'Maris — Coastal Trader', '#c9d8dc');

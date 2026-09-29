@@ -1,46 +1,37 @@
 import type { CampaignSave } from '../state/types';
 import { resolveDialogueIntent, type DialogueSpeakerId } from './DialogueIntent';
+import {
+  applyDialogueKnowledge,
+  dialogueImpression,
+  dialogueMemories,
+  dialogueTurnCount,
+  recordDialogueTurn,
+  saveDialogueImpression,
+  saveDialogueMemory,
+  type DialogueKnowledgeId,
+  type DialogueMemoryImportance,
+} from './DialogueMemory';
 
 export interface DialogueTurn {
   role: 'player' | 'npc';
   text: string;
 }
 
+export type DialogueAction =
+  | { type: 'none'; target: 'none' }
+  | { type: 'set_course'; target: 'harrow' | 'gullrock' }
+  | { type: 'set_helm'; target: 'sera' | 'alexander' }
+  | { type: 'learn_fact'; target: DialogueKnowledgeId };
+
 export interface DialogueAIResult {
   reply: string;
   source: 'ai' | 'local';
   model?: string;
-  action?: {
-    type: 'none' | 'set_course';
-    target: 'none' | 'harrow' | 'gullrock';
-  };
+  action: DialogueAction;
+  learnedFact?: DialogueKnowledgeId;
 }
 
 const DIALOGUE_ENDPOINT = 'https://alexander-vane-rpg.vercel.app/api/dialogue';
-const MEMORY_PREFIX = 'dialogueMemory-';
-
-function memoriesFor(save: CampaignSave, speaker: DialogueSpeakerId): string[] {
-  const raw = save.world.flags[`${MEMORY_PREFIX}${speaker}`];
-  if (typeof raw !== 'string') return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((entry): entry is string => typeof entry === 'string').slice(-6);
-  } catch {
-    return [];
-  }
-}
-
-function saveMemory(save: CampaignSave, speaker: DialogueSpeakerId, memory: string): void {
-  const clean = memory.trim().slice(0, 180);
-  if (!clean) return;
-
-  const memories = memoriesFor(save, speaker);
-  if (!memories.some((entry) => entry.toLowerCase() === clean.toLowerCase())) {
-    memories.push(clean);
-  }
-  save.world.flags[`${MEMORY_PREFIX}${speaker}`] = JSON.stringify(memories.slice(-6));
-}
 
 function destination(save: CampaignSave): string {
   return typeof save.world.flags.shipDestination === 'string'
@@ -57,6 +48,7 @@ function buildContext(speaker: DialogueSpeakerId, save: CampaignSave) {
     day: save.world.day,
     minuteOfDay: save.world.minuteOfDay,
     destination: destination(save),
+    sailingDelegated: save.world.flags.sailingDelegated !== false,
     ship: {
       name: save.ship.name,
       hull: save.ship.hull,
@@ -78,11 +70,50 @@ function buildContext(speaker: DialogueSpeakerId, save: CampaignSave) {
         }))
       : [],
     knownEvents: crewSpeaker
-      ? save.journal.filter((entry) => entry.known).slice(-8).map((entry) => `${entry.title}: ${entry.body}`)
+      ? save.journal.filter((entry) => entry.known).slice(-10).map((entry) => `${entry.title}: ${entry.body}`)
       : [],
-    memories: memoriesFor(save, speaker),
+    knowledgeState: {
+      vossRumor: save.world.flags.gullrockVossRumorKnown === true,
+      marinePatrol: save.world.flags.gullrockMarinePatrolKnown === true,
+      northRoad: save.world.flags.gullrockNorthRoadRumorKnown === true,
+      eastWind: save.world.flags.gullrockEastWindKnown === true,
+    },
+    memories: dialogueMemories(save, speaker),
+    priorImpression: dialogueImpression(save, speaker),
+    interactionCount: dialogueTurnCount(save, speaker),
     fruitKnownToCrew: crewSpeaker && save.player.fruit.eaten,
   };
+}
+
+function parseAction(data: {
+  action?: {
+    type?: 'none' | 'set_course' | 'set_helm' | 'learn_fact';
+    target?: string;
+  };
+}): DialogueAction {
+  const action = data.action;
+
+  if (action?.type === 'set_course' && (action.target === 'harrow' || action.target === 'gullrock')) {
+    return { type: 'set_course', target: action.target };
+  }
+
+  if (action?.type === 'set_helm' && (action.target === 'sera' || action.target === 'alexander')) {
+    return { type: 'set_helm', target: action.target };
+  }
+
+  if (
+    action?.type === 'learn_fact' &&
+    (
+      action.target === 'gullrock-voss-rumor' ||
+      action.target === 'gullrock-marine-patrol' ||
+      action.target === 'gullrock-north-road' ||
+      action.target === 'gullrock-east-wind'
+    )
+  ) {
+    return { type: 'learn_fact', target: action.target };
+  }
+
+  return { type: 'none', target: 'none' };
 }
 
 export async function resolveDialogueAI(
@@ -93,6 +124,7 @@ export async function resolveDialogueAI(
 ): Promise<DialogueAIResult> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 18_000);
+  recordDialogueTurn(save, speaker);
 
   try {
     const response = await fetch(DIALOGUE_ENDPOINT, {
@@ -110,10 +142,12 @@ export async function resolveDialogueAI(
     const data = await response.json().catch(() => ({})) as {
       reply?: string;
       memory?: string;
+      memoryImportance?: DialogueMemoryImportance;
+      impression?: string;
       model?: string;
       action?: {
-        type?: 'none' | 'set_course';
-        target?: 'none' | 'harrow' | 'gullrock';
+        type?: 'none' | 'set_course' | 'set_helm' | 'learn_fact';
+        target?: string;
       };
       code?: string;
     };
@@ -125,17 +159,31 @@ export async function resolveDialogueAI(
     const reply = data.reply?.trim();
     if (!reply) throw new Error('Dialogue API returned no reply');
 
-    if (data.memory) saveMemory(save, speaker, data.memory);
+    if (data.memory) {
+      const importance: DialogueMemoryImportance =
+        data.memoryImportance === 'core' || data.memoryImportance === 'minor'
+          ? data.memoryImportance
+          : 'notable';
+      saveDialogueMemory(save, speaker, data.memory, importance);
+    }
 
-    const action = data.action?.type === 'set_course' && (data.action.target === 'harrow' || data.action.target === 'gullrock')
-      ? { type: 'set_course' as const, target: data.action.target }
-      : { type: 'none' as const, target: 'none' as const };
+    if (data.impression) {
+      saveDialogueImpression(save, speaker, data.impression);
+    }
+
+    const action = parseAction(data);
+    let learnedFact: DialogueKnowledgeId | undefined;
+    if (action.type === 'learn_fact') {
+      applyDialogueKnowledge(save, action.target);
+      learnedFact = action.target;
+    }
 
     return {
       reply,
       source: 'ai',
       model: data.model,
       action,
+      learnedFact,
     };
   } catch (error) {
     console.warn('AI dialogue unavailable; using local intent fallback.', error);

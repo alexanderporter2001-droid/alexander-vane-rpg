@@ -11,6 +11,7 @@ const crewHud = fs.readFileSync(new URL('../src/game/systems/CrewStatusHud.ts', 
 const dialogue = fs.readFileSync(new URL('../src/game/systems/DialoguePanel.ts', import.meta.url), 'utf8');
 const intent = fs.readFileSync(new URL('../src/game/systems/DialogueIntent.ts', import.meta.url), 'utf8');
 const aiDialogue = fs.readFileSync(new URL('../src/game/systems/DialogueAI.ts', import.meta.url), 'utf8');
+const dialogueMemory = fs.readFileSync(new URL('../src/game/systems/DialogueMemory.ts', import.meta.url), 'utf8');
 const dialogueApi = fs.readFileSync(new URL('../api/dialogue.js', import.meta.url), 'utf8');
 const interactions = fs.readFileSync(new URL('../src/game/systems/InteractionSystem.ts', import.meta.url), 'utf8');
 
@@ -48,7 +49,7 @@ const checks = [
   ['Gullrock NPCs accept AI typed dialogue', gullrock.includes('resolveDialogueAI') && gullrock.includes('freeform: intentSpeaker')],
   ['Gullrock service NPCs use character sprites', boot.includes("'npc-tavern'") && boot.includes("'npc-harbor'") && boot.includes("'npc-provisioner'") && boot.includes("'npc-shipwright'")],
   ['Gullrock no longer uses service NPC circles', !gullrock.includes("this.add.circle(405, 500") && !gullrock.includes("this.add.circle(575, 560")],
-  ['Gullrock has environmental market detail', gullrock.includes('Market stalls') && gullrock.includes('Non-interactive locals')],
+  ['Gullrock has environmental market detail', gullrock.includes('Market stalls') && gullrock.includes('Named locals are full conversation targets')],
   ['land cameras use a deadzone', harrow.includes('setDeadzone') && gullrock.includes('setDeadzone')],
   ['crew health panel is reduced in size', style.includes('width:184px') && style.includes('height:5px')],
   ['Gullrock service NPCs have names', gullrock.includes('Dren Pike — Harbor Master') && gullrock.includes('Marta Vell — Tavern Keeper') && gullrock.includes('Toma Reed — Provisioner') && gullrock.includes('Brann Cale — Shipwright')],
@@ -62,12 +63,19 @@ const checks = [
   ['named NPCs can introduce themselves', intent.includes('Dren Pike') && intent.includes('Marta Vell') && intent.includes('Toma Reed') && intent.includes('Brann Cale')],
   ['dialogue panel waits for async AI replies', dialogue.includes('Promise<string | null>') && dialogue.includes('dialogue-line-thinking')],
   ['AI dialogue has a local intent fallback', aiDialogue.includes('resolveDialogueIntent') && aiDialogue.includes("source: 'local'")],
-  ['AI dialogue keeps compact per-NPC memories', aiDialogue.includes('dialogueMemory-') && aiDialogue.includes('slice(-6)')],
+  ['AI dialogue keeps prioritized persistent memories', dialogueMemory.includes('memory_importance') || (dialogueMemory.includes('DialogueMemoryImportance') && dialogueMemory.includes('trimMemories'))],
   ['dialogue backend uses the OpenAI Responses API', dialogueApi.includes('https://api.openai.com/v1/responses')],
   ['dialogue backend keeps API key server-side', dialogueApi.includes('process.env.OPENAI_API_KEY') && !aiDialogue.includes('OPENAI_API_KEY')],
   ['dialogue backend separates crew and world models', dialogueApi.includes('gpt-6-sol') && dialogueApi.includes('gpt-6-luna')],
   ['dialogue backend restricts browser origins', dialogueApi.includes('ALLOWED_ORIGINS') && dialogueApi.includes('Origin not allowed')],
-  ['Sera dialogue can propose a real course change', sea.includes("result.action?.type === 'set_course'") && sea.includes('this.navTarget = port')],
+  ['Sera dialogue can propose a real course change', sea.includes("result.action.type === 'set_course'") && sea.includes('this.navTarget = port')],
+  ['Sera dialogue can hand over the helm', sea.includes("result.action.type === 'set_helm'") && sea.includes("this.navigationMode = 'manual'") && sea.includes("this.navigationMode = 'sera'")],
+  ['Gullrock named locals are interactive', gullrock.includes("id: 'elias'") && gullrock.includes("id: 'nico'") && gullrock.includes("id: 'maris'") && gullrock.includes("id: 'perrin'") && gullrock.includes('localConversation')],
+  ['named locals have AI profiles', dialogueApi.includes("elias: {") && dialogueApi.includes("nico: {") && dialogueApi.includes("maris: {") && dialogueApi.includes("perrin: {")],
+  ['dialogue stores private NPC impressions', dialogueMemory.includes('dialogueImpression-') && aiDialogue.includes('saveDialogueImpression')],
+  ['dialogue can persist discovered facts to journal', dialogueMemory.includes('applyDialogueKnowledge') && dialogueMemory.includes('gullrock-voss-rumor') && dialogueMemory.includes('gullrock-marine-patrol')],
+  ['AI actions are server validated per NPC', dialogueApi.includes('validateAction(profile, parsed)') && dialogueApi.includes('allowedKnowledge') && dialogueApi.includes('canControlHelm')],
+  ['dialogue tracks interaction familiarity', dialogueMemory.includes('dialogueTurns-') && aiDialogue.includes('interactionCount')],
 ];
 
 let failures = 0;
