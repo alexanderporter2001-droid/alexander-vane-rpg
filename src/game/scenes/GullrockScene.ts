@@ -31,8 +31,12 @@ export class GullrockScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, this.worldW, this.worldH);
     this.drawPort();
 
-    this.player = this.physics.add.sprite(725, 790, 'alexander').setDepth(50).setCollideWorldBounds(true);
+    const savedSpawn = this.isWalkable(save.player.position.x, save.player.position.y)
+      ? save.player.position
+      : { x: 725, y: 790 };
+    this.player = this.physics.add.sprite(savedSpawn.x, savedSpawn.y, 'alexander').setDepth(50).setCollideWorldBounds(true);
     this.player.setBodySize(34, 30).setOffset(19, 70);
+    this.lastValid.set(savedSpawn.x, savedSpawn.y);
 
     this.crew = [
       this.physics.add.sprite(665, 825, 'sera').setDepth(48).setCollideWorldBounds(true),
@@ -79,6 +83,8 @@ export class GullrockScene extends Phaser.Scene {
 
     const current = this.interactions.update();
     this.mobile?.setInteract(current?.label ?? null);
+    const save = SaveManager.get();
+    save.player.position = { x: this.player.x, y: this.player.y };
     this.updateHud();
 
     if (this.time.now - this.lastSaveAt > 20_000) {
@@ -225,7 +231,16 @@ export class GullrockScene extends Phaser.Scene {
   private harborMaster(): void {
     const save = SaveManager.get();
 
-    if (!save.world.flags.gullrockDockFeePaid) {
+    const legacyPaid = save.world.flags.gullrockDockFeePaid === true;
+    let paidUntilDay = Number(save.world.flags.gullrockDockFeeUntilDay ?? 0);
+    if (legacyPaid && paidUntilDay === 0) {
+      paidUntilDay = save.world.day + 1;
+      save.world.flags.gullrockDockFeeUntilDay = paidUntilDay;
+      save.world.flags.gullrockDockFeePaid = false;
+    }
+    const berthPaid = paidUntilDay >= save.world.day;
+
+    if (!berthPaid) {
       const canPay = save.player.berries >= 200;
       this.openDialogue(
         'Harbor Master',
@@ -255,17 +270,19 @@ export class GullrockScene extends Phaser.Scene {
 
   private payDockFee(): void {
     const save = SaveManager.get();
-    if (save.world.flags.gullrockDockFeePaid || save.player.berries < 200) return;
+    const paidUntilDay = Number(save.world.flags.gullrockDockFeeUntilDay ?? 0);
+    if (paidUntilDay >= save.world.day || save.player.berries < 200) return;
 
     save.player.berries -= 200;
-    save.world.flags.gullrockDockFeePaid = true;
+    save.world.flags.gullrockDockFeePaid = false;
+    save.world.flags.gullrockDockFeeUntilDay = save.world.day + 1;
     advanceWorldMinutes(save, 4);
 
     if (!save.journal.some((entry) => entry.id === 'gullrock-berth')) {
       save.journal.push({
         id: 'gullrock-berth',
         title: 'Gullrock berth',
-        body: 'The Wayward Gull has a paid berth at Gullrock through the next day.',
+        body: `The Wayward Gull has a paid berth at Gullrock through Day ${save.world.day + 1}.`,
         known: true,
       });
     }
@@ -548,6 +565,7 @@ export class GullrockScene extends Phaser.Scene {
 
   private confirmSetSail(): void {
     const save = SaveManager.get();
+    this.mobile?.setVisible(false);
     save.world.scene = 'sea';
     save.world.locationId = 'east-blue-open-sea';
     save.ship.x = 2610;
@@ -584,7 +602,9 @@ export class GullrockScene extends Phaser.Scene {
       formatWorldTime(save),
       `Berries ${save.player.berries.toLocaleString()}`,
       `Gull hull ${Math.ceil(save.ship.hull)}/${save.ship.maxHull} · Supplies ${Math.floor(save.ship.supplies)}`,
-      'F / INTERACT near people and objects',
+      this.sys.game.device.input.touch
+        ? 'Use INTERACT near people and objects'
+        : 'F near people and objects',
     ]);
   }
 
