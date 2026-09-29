@@ -14,6 +14,8 @@ const aiDialogue = fs.readFileSync(new URL('../src/game/systems/DialogueAI.ts', 
 const dialogueMemory = fs.readFileSync(new URL('../src/game/systems/DialogueMemory.ts', import.meta.url), 'utf8');
 const dialogueApi = fs.readFileSync(new URL('../api/dialogue.js', import.meta.url), 'utf8');
 const interactions = fs.readFileSync(new URL('../src/game/systems/InteractionSystem.ts', import.meta.url), 'utf8');
+const equipment = fs.readFileSync(new URL('../src/game/systems/Equipment.ts', import.meta.url), 'utf8');
+const pause = fs.readFileSync(new URL('../src/game/scenes/PauseScene.ts', import.meta.url), 'utf8');
 
 const checks = [
   ['touch detection uses maxTouchPoints', mobile.includes('navigator.maxTouchPoints > 0')],
@@ -83,6 +85,17 @@ const checks = [
   ['AI output budget is capped tightly', dialogueApi.includes('max_output_tokens: 500')],
   ['credit exhaustion has a specific dialogue signal', dialogueApi.includes("code: 'credits_exhausted'") && aiDialogue.includes('AI CREDITS EMPTY')],
   ['invalid API keys have a distinct dialogue signal', dialogueApi.includes("code: 'api_key_invalid'") && aiDialogue.includes('AI KEY INVALID/EXPIRED')],
+  ['berries are visible during Harrow combat', harrow.includes('Berries ${save.player.berries.toLocaleString()}')],
+  ['berries are visible while sailing', sea.includes('Berries ${save.player.berries.toLocaleString()}')],
+  ['equipment catalog has compatibility tags', equipment.includes('compatibleTags') && equipment.includes('isCompatible')],
+  ['equipment prevents duplicate over-equipping', equipment.includes('availableEquipmentCount') && equipment.includes('equippedCount')],
+  ['captain journal has a gear tab', pause.includes("'gear'") && pause.includes('renderGear') && pause.includes('equipItem')],
+  ['Gullrock trader sells persistent equipment', gullrock.includes('traderShop') && gullrock.includes('equipmentInventory') && gullrock.includes('buyEquipment')],
+  ['Gullrock has paid physical dock work', gullrock.includes('gullrockDockJobActive') && gullrock.includes('workCargoPoint') && gullrock.includes('2_400')],
+  ['dock work has visible progress markers', gullrock.includes('createDockJobMarkers') && gullrock.includes('CARGO 1')],
+  ['equipped combat gear affects damage', harrow.includes('equippedEffects') && harrow.includes('meleeDamageBonus') && harrow.includes('damageReduction')],
+  ['navigator gear affects sea approach behavior', sea.includes('seaAwarenessBonus') && sea.includes('520 + awareness')],
+  ['future crew use crew AI routing by identity', aiDialogue.includes('save.crew.find((candidate) => candidate.id === speaker)') && dialogueApi.includes('dynamicCrewProfile') && dialogueApi.includes('if (!context.crewIdentity) return economyModel')],
 ];
 
 let failures = 0;

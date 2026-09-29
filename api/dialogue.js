@@ -205,12 +205,27 @@ function sanitizeContext(context) {
     ? source.knowledgeState
     : {};
 
+  const crewIdentity = source.crewIdentity && typeof source.crewIdentity === 'object'
+    ? {
+        id: cleanText(source.crewIdentity.id, 40),
+        name: cleanText(source.crewIdentity.name, 80),
+        role: cleanText(source.crewIdentity.role, 80),
+        notes: Array.isArray(source.crewIdentity.notes)
+          ? source.crewIdentity.notes.slice(0, 8).map((note) => cleanText(note, 160)).filter(Boolean)
+          : [],
+        capabilities: Array.isArray(source.crewIdentity.capabilities)
+          ? source.crewIdentity.capabilities.slice(0, 8).map((capability) => cleanText(capability, 60)).filter(Boolean)
+          : [],
+      }
+    : null;
+
   return {
     location: cleanText(source.location, 80),
     day: Number.isFinite(source.day) ? source.day : 1,
     minuteOfDay: Number.isFinite(source.minuteOfDay) ? source.minuteOfDay : 0,
     destination: cleanText(source.destination, 40),
     sailingDelegated: source.sailingDelegated !== false,
+    crewIdentity,
     ship: source.ship && typeof source.ship === 'object' ? {
       name: cleanText(source.ship.name, 40),
       hull: Number(source.ship.hull) || 0,
@@ -253,7 +268,7 @@ function pickModel(speakerId, message, context, history) {
   const economyModel = process.env.OPENAI_WORLD_MODEL || 'gpt-6-luna';
   const deepModel = process.env.OPENAI_CREW_MODEL || 'gpt-6-sol';
 
-  if (speakerId !== 'sera' && speakerId !== 'rowan') return economyModel;
+  if (!context.crewIdentity) return economyModel;
 
   const text = message.toLowerCase();
   const routineShipOrder =
@@ -304,6 +319,24 @@ function pickModel(speakerId, message, context, history) {
   if (history.length >= 4 && historyChars >= 650) complexity += 1;
 
   return complexity >= 4 ? deepModel : economyModel;
+}
+
+function dynamicCrewProfile(speakerId, context) {
+  const identity = context?.crewIdentity;
+  if (!identity || identity.id !== speakerId || !identity.name || !identity.role) return null;
+
+  return {
+    name: identity.name,
+    role: identity.role,
+    personality: identity.notes.length
+      ? `Persistent crew member. Established notes: ${identity.notes.join(' | ')}`
+      : 'Persistent crew member with an independent personality that should emerge consistently from supplied memories and events.',
+    knownFacts: [],
+    hakiDisclosureAllowed: false,
+    canSetCourse: identity.capabilities.includes('navigation'),
+    canControlHelm: identity.capabilities.includes('helm'),
+    allowedKnowledge: [],
+  };
 }
 
 function outputText(payload) {
@@ -444,7 +477,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({
       ok: true,
-      service: 'alexander-vane-dialogue-v0.3.12',
+      service: 'alexander-vane-dialogue-v0.3.13',
       configured: Boolean(process.env.OPENAI_API_KEY),
       economyModel: process.env.OPENAI_WORLD_MODEL || 'gpt-6-luna',
       deepModel: process.env.OPENAI_CREW_MODEL || 'gpt-6-sol',
@@ -482,14 +515,14 @@ export default async function handler(req, res) {
   }
 
   const speakerId = cleanText(body.speakerId, 40);
-  const profile = profiles[speakerId];
-  if (!profile) return res.status(400).json({ error: 'Unknown dialogue speaker.' });
-
   const message = cleanText(body.message, 600);
   if (!message) return res.status(400).json({ error: 'Dialogue message is empty.' });
 
   const history = sanitizeHistory(body.history);
   const context = sanitizeContext(body.context);
+  const profile = profiles[speakerId] || dynamicCrewProfile(speakerId, context);
+  if (!profile) return res.status(400).json({ error: 'Unknown dialogue speaker.' });
+
   const model = pickModel(speakerId, message, context, history);
 
   const instructions = [
@@ -505,8 +538,8 @@ export default async function handler(req, res) {
     'Set remember=true only for durable facts, meaningful promises, important orders, relationship-changing moments, threats, confessions, or personal preferences this NPC would plausibly remember later. Small talk should not become memory.',
     'Use memory_importance=core only for identity-shaping promises, betrayals, life-saving events, major commitments, or similarly durable moments. Use notable for useful lasting facts and minor for modest personal details.',
     'A learn_fact action means the NPC actually communicated that exact approved fact in the spoken reply. Never mark a fact learned unless the reply clearly conveys it.',
-    'Only Sera may use set_course, and only when Alexander clearly asks or orders her to change the Wayward Gull\'s destination to Harrow Island or Gullrock Port.',
-    'Only Sera may use set_helm, and only when Alexander clearly tells her to take/keep the helm or clearly says he is taking the helm himself.',
+    'Use set_course only if this crew profile has canSetCourse=true and Alexander clearly asks or orders a supported destination change.',
+    'Use set_helm only if this crew profile has canControlHelm=true and Alexander clearly tells that crew member to take/keep the helm or clearly says he is taking it himself.',
     'Never use an action as a substitute for spoken acknowledgement. The reply should still sound like the NPC responding naturally.',
   ].join('\n');
 

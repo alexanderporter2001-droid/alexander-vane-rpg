@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
 import type { CaptainOrder } from '../state/types';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
+import { equippedEffects } from '../systems/Equipment';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
@@ -143,7 +144,9 @@ export class HarrowScene extends Phaser.Scene {
         const bullet = raw as Phaser.Physics.Arcade.Image;
         if (!bullet.active || unit.hp <= 0) return;
         bullet.disableBody(true, true);
-        unit.hp = Math.max(0, unit.hp - 10);
+        const state = SaveManager.get().crew.find((member) => member.id === unit.id);
+        const reduction = state ? equippedEffects(state.equipment).damageReduction : 0;
+        unit.hp = Math.max(0, unit.hp - Math.max(1, 10 - reduction));
         if (unit.hp <= 0) this.markCrewDown(unit);
         else this.hitFlash(unit.sprite);
       });
@@ -278,11 +281,13 @@ export class HarrowScene extends Phaser.Scene {
       ? [
           `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp} · STM ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
           `Pull familiarity ${Math.round(save.player.fruit.mastery * 100)}%`,
+          `Berries ${save.player.berries.toLocaleString()}`,
         ]
       : [
           `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp}`,
           `Stamina ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
           `Pull familiarity ${Math.round(save.player.fruit.mastery * 100)}%`,
+          `Berries ${save.player.berries.toLocaleString()}`,
           `Order: ${this.order.replace('-', ' ')}`,
         ]);
     const alerted = this.enemies.filter((e) => e.alert && e.hp > 0).length;
@@ -463,7 +468,9 @@ export class HarrowScene extends Phaser.Scene {
         rowan.sprite.setVelocity(0, 0);
         if (this.time.now >= rowan.attackReadyAt) {
           rowan.attackReadyAt = this.time.now + 720;
-          target.enemy.hp -= 22;
+          const rowanState = SaveManager.get().crew.find((member) => member.id === 'rowan');
+          const gearBonus = rowanState ? equippedEffects(rowanState.equipment).meleeDamageBonus : 0;
+          target.enemy.hp -= 22 + gearBonus;
           this.hitFlash(target.enemy.sprite);
           if (target.enemy.hp <= 0) this.downEnemy(target.enemy);
         }
@@ -502,7 +509,8 @@ export class HarrowScene extends Phaser.Scene {
       if (to.length() > (this.mobile ? 86 : 80)) continue;
       if (to.clone().normalize().dot(facing) < -0.08) continue;
       enemy.alert = true;
-      enemy.hp -= 26;
+      const gearBonus = equippedEffects(SaveManager.get().player.equipment).meleeDamageBonus;
+      enemy.hp -= 26 + gearBonus;
       this.hitFlash(enemy.sprite);
       if (enemy.hp <= 0) this.downEnemy(enemy);
     }
@@ -659,7 +667,8 @@ export class HarrowScene extends Phaser.Scene {
 
   private damagePlayer(amount: number): void {
     const save = SaveManager.get();
-    save.player.hp = Math.max(0, save.player.hp - amount);
+    const reduction = equippedEffects(save.player.equipment).damageReduction;
+    save.player.hp = Math.max(0, save.player.hp - Math.max(1, amount - reduction));
     this.hitFlash(this.player);
     this.cameras.main.shake(85, 0.0045);
     if (save.player.hp <= 0) {

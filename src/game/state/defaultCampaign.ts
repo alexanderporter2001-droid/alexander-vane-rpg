@@ -1,7 +1,7 @@
 import type { CampaignSave } from './types';
 
-export const GAME_VERSION = '0.3.12';
-export const SAVE_VERSION = 3 as const;
+export const GAME_VERSION = '0.3.13';
+export const SAVE_VERSION = 4 as const;
 
 export function createDefaultCampaign(): CampaignSave {
   return {
@@ -18,6 +18,8 @@ export function createDefaultCampaign(): CampaignSave {
       berries: 308_600,
       bounty: 6_500_000,
       position: { x: 720, y: 870 },
+      equipmentTags: ['captain', 'swords', 'light-armor', 'tools'],
+      equipment: { weapon: null, armor: null, tool: null, accessory: null },
       fruit: {
         eaten: true,
         fruitNameKnown: false,
@@ -39,6 +41,9 @@ export function createDefaultCampaign(): CampaignSave {
         loyalty: 0.62,
         morale: 0.67,
         notes: ['Cautious navigator', 'Acts independently', 'Knows the sea better than Alexander'],
+        equipmentTags: ['navigator', 'light-armor', 'tools', 'light-weapons'],
+        capabilities: ['navigation', 'helm'],
+        equipment: { weapon: null, armor: null, tool: null, accessory: null },
       },
       {
         id: 'rowan',
@@ -50,6 +55,9 @@ export function createDefaultCampaign(): CampaignSave {
         loyalty: 0.58,
         morale: 0.74,
         notes: ['Uses chain hooks', 'Wants freedom, strength, and a name across the seas'],
+        equipmentTags: ['fighter', 'chain-weapons', 'medium-armor', 'tools'],
+        capabilities: ['frontline-combat'],
+        equipment: { weapon: null, armor: null, tool: null, accessory: null },
       },
     ],
     ship: {
@@ -68,6 +76,7 @@ export function createDefaultCampaign(): CampaignSave {
       'Rations': 5,
       'Rope': 1,
     },
+    equipmentInventory: {},
     journal: [
       {
         id: 'harrow-escape',
