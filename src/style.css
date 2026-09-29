@@ -436,3 +436,9 @@ button,input,textarea{font:inherit}
   .dialogue-input{min-height:40px;max-height:70px}
   .dialogue-choices{max-height:44svh}
 }
+
+
+/* Journal owns the screen while open; gameplay DOM HUD/controls must not bleed through. */
+body.journal-open .mobile-controls,
+body.journal-open .crew-status-hud,
+body.journal-open .dialogue-panel { display: none !important; }
