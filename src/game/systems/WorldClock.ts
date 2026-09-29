@@ -8,6 +8,14 @@ export function advanceWorldClock(save: CampaignSave, deltaSeconds: number, mult
   }
 }
 
+export function advanceWorldMinutes(save: CampaignSave, minutes: number): void {
+  save.world.minuteOfDay += Math.max(0, minutes);
+  while (save.world.minuteOfDay >= 1440) {
+    save.world.minuteOfDay -= 1440;
+    save.world.day += 1;
+  }
+}
+
 export function formatWorldTime(save: CampaignSave): string {
   const hour = Math.floor(save.world.minuteOfDay / 60) % 24;
   const minute = Math.floor(save.world.minuteOfDay % 60);
