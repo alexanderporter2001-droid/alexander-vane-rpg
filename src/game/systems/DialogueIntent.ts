@@ -1,16 +1,6 @@
 import type { CampaignSave } from '../state/types';
 
-export type DialogueSpeakerId =
-  | 'sera'
-  | 'rowan'
-  | 'harbor-master'
-  | 'tavern-keeper'
-  | 'provisioner'
-  | 'shipwright'
-  | 'elias'
-  | 'nico'
-  | 'maris'
-  | 'perrin';
+export type DialogueSpeakerId = string;
 
 export interface IntentReply {
   reply: string;
@@ -20,7 +10,7 @@ function includesAny(text: string, terms: string[]): boolean {
   return terms.some((term) => text.includes(term));
 }
 
-function crewState(save: CampaignSave, id: 'sera' | 'rowan') {
+function crewState(save: CampaignSave, id: string) {
   return save.crew.find((member) => member.id === id);
 }
 
@@ -314,6 +304,22 @@ export function resolveDialogueIntent(
       return { reply: '“Had two merchants come in angry about the north road this week. Missing goods, same story.”' };
     }
     return { reply: isQuestion ? '“Maybe I heard something while unloading. What are you asking?”' : 'Perrin keeps one hand on a crate and waits.' };
+  }
+
+  const genericCrew = crewState(save, speaker);
+  if (genericCrew) {
+    if (includesAny(text, ['hurt', 'health', 'injury', 'injured', 'okay', 'alright', 'how are you'])) {
+      return { reply: `“I’m at ${Math.ceil(genericCrew.hp)} out of ${genericCrew.maxHp}. I’ll tell you if I can’t do my job.”` };
+    }
+    if (includesAny(text, ['goal', 'dream', 'want from', 'future'])) {
+      const personal = genericCrew.notes.find((note) => /want|dream|goal|future/i.test(note));
+      return { reply: personal ? `“${personal}.”` : '“Ask me again when we know each other better.”' };
+    }
+    return {
+      reply: isQuestion
+        ? 'They consider the question instead of inventing an answer. “I don’t know enough to say yet.”'
+        : 'They give a short nod. “I heard you.”',
+    };
   }
 
   return { reply: 'No response.' };
