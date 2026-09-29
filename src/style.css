@@ -13,6 +13,7 @@ html,body,#game-root{
 canvas{display:block;width:100%;height:100%;touch-action:none}
 button,input,textarea{font:inherit}
 
+/* Native mobile controls */
 .mobile-controls{
   position:fixed;
   inset:0;
@@ -25,9 +26,9 @@ button,input,textarea{font:inherit}
   position:absolute;
   left:0;
   bottom:0;
-  width:min(46vw,320px);
+  width:min(48vw,330px);
   min-width:190px;
-  height:min(38vh,320px);
+  height:min(36vh,330px);
   min-height:190px;
   pointer-events:auto;
   touch-action:none;
@@ -41,29 +42,30 @@ button,input,textarea{font:inherit}
   transition:opacity .12s ease;
 }
 .mobile-joystick-base{
-  width:118px;
-  height:118px;
+  width:116px;
+  height:116px;
   background:rgba(221,235,240,.10);
-  border:2px solid rgba(221,235,240,.28);
+  border:2px solid rgba(221,235,240,.30);
   box-shadow:0 4px 18px rgba(0,0,0,.20);
-  opacity:.68;
+  opacity:.58;
 }
 .mobile-joystick-nub{
-  width:52px;
-  height:52px;
-  background:rgba(232,240,243,.44);
-  border:2px solid rgba(255,255,255,.46);
+  width:50px;
+  height:50px;
+  background:rgba(232,240,243,.48);
+  border:2px solid rgba(255,255,255,.48);
   opacity:.80;
 }
 .mobile-joystick-zone.is-active .mobile-joystick-base,
 .mobile-joystick-zone.is-active .mobile-joystick-nub{opacity:1}
+
 .mobile-action{
   position:absolute;
   display:flex;
   align-items:center;
   justify-content:center;
-  border:2px solid rgba(255,255,255,.32);
-  background:rgba(18,39,50,.82);
+  border:2px solid rgba(255,255,255,.30);
+  background:rgba(18,39,50,.80);
   color:#f2f6f7;
   font-weight:800;
   font-size:11px;
@@ -71,68 +73,89 @@ button,input,textarea{font:inherit}
   pointer-events:auto;
   touch-action:manipulation;
   -webkit-tap-highlight-color:transparent;
-  box-shadow:0 4px 14px rgba(0,0,0,.23);
+  box-shadow:0 4px 14px rgba(0,0,0,.22);
 }
-.mobile-action.is-pressed{transform:scale(.90);filter:brightness(1.22)}
+.mobile-action.is-pressed{transform:scale(.90);filter:brightness(1.2)}
 .mobile-attack{
-  right:max(14px,env(safe-area-inset-right));
+  right:max(12px,env(safe-area-inset-right));
   bottom:calc(max(14px,env(safe-area-inset-bottom)) + 18px);
-  width:84px;height:84px;border-radius:50%;
-  border-color:rgba(216,180,95,.78);
+  width:88px;
+  height:88px;
+  border-radius:50%;
+  font-size:12px;
+  border-color:rgba(216,180,95,.80);
 }
 .mobile-dash{
-  right:112px;
-  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 22px);
-  width:68px;height:68px;border-radius:50%;
-  border-color:rgba(178,194,202,.72);
+  right:114px;
+  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 28px);
+  width:66px;
+  height:66px;
+  border-radius:50%;
+  border-color:rgba(178,194,202,.74);
 }
 .mobile-pull{
-  right:100px;
-  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 102px);
-  width:70px;height:70px;border-radius:50%;
-  border-color:rgba(121,191,211,.82);
+  right:max(20px,env(safe-area-inset-right));
+  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 124px);
+  width:68px;
+  height:68px;
+  border-radius:50%;
+  border-color:rgba(121,191,211,.84);
 }
 .mobile-order{
-  right:max(18px,env(safe-area-inset-right));
-  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 122px);
-  width:78px;height:48px;border-radius:15px;
+  right:max(16px,env(safe-area-inset-right));
+  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 210px);
+  width:96px;
+  height:44px;
+  border-radius:14px;
+  font-size:10px;
   border-color:rgba(200,154,200,.72);
 }
 .mobile-interact{
   right:max(16px,env(safe-area-inset-right));
-  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 184px);
-  width:96px;height:50px;border-radius:15px;
+  bottom:calc(max(14px,env(safe-area-inset-bottom)) + 210px);
+  width:100px;
+  height:50px;
+  border-radius:14px;
+  font-size:10px;
   border-color:rgba(120,198,144,.84);
 }
 .mobile-pause{
   right:max(12px,env(safe-area-inset-right));
   top:max(12px,env(safe-area-inset-top));
-  width:54px;height:48px;border-radius:14px;
+  width:54px;
+  height:48px;
+  border-radius:14px;
   font-size:22px;
   border-color:rgba(168,197,206,.65);
 }
+
+/* Transient messages live below the HUD instead of covering it. */
 .game-toast{
   position:fixed;
-  z-index:1800;
   left:50%;
-  top:calc(max(8px,env(safe-area-inset-top)) + 104px);
-  width:max-content;
-  max-width:min(560px,calc(100vw - 24px));
-  padding:9px 13px;
-  border:1px solid rgba(168,197,206,.30);
+  top:max(108px,calc(env(safe-area-inset-top) + 96px));
+  z-index:1500;
+  width:min(520px,calc(100vw - 24px));
+  transform:translate(-50%,-8px);
+  padding:9px 12px;
+  border:1px solid rgba(168,197,206,.34);
   border-radius:10px;
-  background:rgba(7,17,22,.90);
+  background:rgba(7,17,22,.92);
   color:#edf4f6;
   font-size:13px;
   line-height:1.35;
   text-align:center;
-  pointer-events:none;
   opacity:0;
-  transform:translate(-50%,-6px);
-  transition:opacity .16s ease,transform .16s ease;
+  pointer-events:none;
+  transition:opacity .14s ease,transform .14s ease;
+  box-shadow:0 7px 22px rgba(0,0,0,.28);
 }
-.game-toast.is-visible{opacity:1;transform:translate(-50%,0)}
+.game-toast.is-visible{
+  opacity:1;
+  transform:translate(-50%,0);
+}
 
+/* Responsive conversation overlay */
 .dialogue-overlay{
   position:fixed;
   inset:0;
@@ -145,7 +168,7 @@ button,input,textarea{font:inherit}
     max(10px,env(safe-area-inset-right))
     max(12px,env(safe-area-inset-bottom))
     max(10px,env(safe-area-inset-left));
-  background:rgba(2,7,10,.78);
+  background:rgba(2,7,10,.82);
   pointer-events:auto;
   touch-action:pan-y;
   overscroll-behavior:contain;
@@ -159,11 +182,10 @@ button,input,textarea{font:inherit}
   border:2px solid rgba(216,180,95,.72);
   border-radius:14px;
   background:rgba(7,17,22,.99);
-  box-shadow:0 18px 60px rgba(0,0,0,.5);
 }
 .dialogue-speaker{
   flex:0 0 auto;
-  padding:16px 18px 10px;
+  padding:14px 16px 10px;
   color:#f1e6ca;
   font-family:Georgia,serif;
   font-size:16px;
@@ -177,7 +199,7 @@ button,input,textarea{font:inherit}
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
   touch-action:pan-y;
-  padding:14px 18px 18px;
+  padding:13px 16px 16px;
   color:#e2ecef;
   font-size:15px;
   line-height:1.5;
@@ -187,8 +209,8 @@ button,input,textarea{font:inherit}
   flex:0 0 auto;
   display:grid;
   gap:8px;
-  padding:12px;
-  border-top:1px solid rgba(255,255,255,.1);
+  padding:11px;
+  border-top:1px solid rgba(255,255,255,.10);
   background:#0a171d;
   max-height:44svh;
   overflow-y:auto;
@@ -216,126 +238,74 @@ button,input,textarea{font:inherit}
 }
 
 @media (max-width:430px){
-  .mobile-joystick-zone{width:52vw;min-width:176px;height:32vh;min-height:180px}
+  .mobile-joystick-zone{
+    width:54vw;
+    min-width:176px;
+    height:31vh;
+    min-height:178px;
+  }
   .mobile-joystick-base{width:108px;height:108px}
-  .mobile-attack{width:78px;height:78px}
-  .mobile-dash{right:102px;width:64px;height:64px}
-  .mobile-pull{right:92px;bottom:calc(max(12px,env(safe-area-inset-bottom)) + 96px);width:64px;height:64px}
-  .mobile-order{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 112px);width:74px;height:44px}
-  .mobile-interact{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 168px);width:90px;height:46px}
-  .dialogue-overlay{align-items:stretch}
-  .dialogue-panel{max-height:100%;height:100%;border-radius:12px}
-  .dialogue-speaker{font-size:15px;padding:13px 14px 9px}
-  .dialogue-body{font-size:14px;padding:12px 14px 14px}
-  .dialogue-choices{padding:10px;gap:7px;max-height:48svh}
-  .dialogue-choice{min-height:44px;font-size:12px}
-}
-@media (orientation:landscape) and (max-height:520px){
-  .mobile-joystick-zone{width:40vw;max-width:270px;height:54vh;max-height:240px}
-  .mobile-joystick-base{width:102px;height:102px}
-  .mobile-attack{width:70px;height:70px}
-  .mobile-dash{right:96px;width:60px;height:60px}
-  .mobile-pull{right:86px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 84px);width:60px;height:60px}
-  .mobile-order{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 92px);width:70px;height:40px}
-  .mobile-interact{bottom:calc(max(8px,env(safe-area-inset-bottom)) + 142px);width:84px;height:42px}
-  .game-toast{top:84px;font-size:12px}
-  .dialogue-overlay{align-items:stretch}
-  .dialogue-panel{height:100%;max-height:100%}
-  .dialogue-choices{max-height:52svh}
-}
-
-  .mobile-joystick-base{width:100px;height:100px}
-  .mobile-action{width:58px;height:58px;font-size:9px}
-  .mobile-attack{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 12px)}
-  .mobile-dash{right:92px;bottom:calc(max(10px,env(safe-area-inset-bottom)) + 8px)}
-  .mobile-pull{right:84px;bottom:calc(max(10px,env(safe-area-inset-bottom)) + 72px)}
-  .mobile-order{bottom:calc(max(10px,env(safe-area-inset-bottom)) + 78px)}
-  .mobile-interact{right:14px;bottom:calc(max(10px,env(safe-area-inset-bottom)) + 146px);width:64px;height:64px}
-  .dialogue-overlay{align-items:stretch}
-  .dialogue-panel{height:100%;max-height:100%}
-  .dialogue-choices{max-height:52svh}
-}
-
-
-/* v0.3.5 phone combat ergonomics */
-.game-toast{
-  position:fixed;
-  left:50%;
-  top:max(104px,calc(env(safe-area-inset-top) + 92px));
-  z-index:1500;
-  width:min(520px,calc(100vw - 24px));
-  transform:translate(-50%,-8px);
-  padding:10px 12px;
-  border:1px solid rgba(168,197,206,.38);
-  border-radius:10px;
-  background:rgba(7,17,22,.94);
-  color:#edf4f6;
-  font-size:13px;
-  line-height:1.35;
-  text-align:center;
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .14s ease,transform .14s ease;
-  box-shadow:0 7px 22px rgba(0,0,0,.3);
-}
-.game-toast.is-visible{
-  opacity:1;
-  transform:translate(-50%,0);
-}
-
-.mobile-attack{
-  right:max(14px,env(safe-area-inset-right));
-  bottom:calc(max(18px,env(safe-area-inset-bottom)) + 22px);
-  width:88px;
-  height:88px;
-  font-size:12px;
-}
-.mobile-dash{
-  right:116px;
-  bottom:calc(max(18px,env(safe-area-inset-bottom)) + 30px);
-  width:66px;
-  height:66px;
-}
-.mobile-pull{
-  right:max(24px,env(safe-area-inset-right));
-  bottom:calc(max(18px,env(safe-area-inset-bottom)) + 126px);
-  width:68px;
-  height:68px;
-}
-.mobile-order,.mobile-interact{
-  right:max(16px,env(safe-area-inset-right));
-  bottom:calc(max(18px,env(safe-area-inset-bottom)) + 210px);
-  width:96px;
-  height:44px;
-  border-radius:13px;
-  font-size:10px;
-}
-.mobile-interact{
-  height:52px;
-  border-radius:14px;
-}
-
-@media (max-width:430px){
+  .mobile-attack{width:82px;height:82px;right:10px}
+  .mobile-dash{width:62px;height:62px;right:102px}
+  .mobile-pull{
+    width:64px;height:64px;
+    right:18px;
+    bottom:calc(max(12px,env(safe-area-inset-bottom)) + 112px);
+  }
+  .mobile-order,.mobile-interact{
+    right:12px;
+    bottom:calc(max(12px,env(safe-area-inset-bottom)) + 188px);
+    width:90px;
+  }
   .game-toast{
-    top:max(94px,calc(env(safe-area-inset-top) + 82px));
+    top:max(102px,calc(env(safe-area-inset-top) + 90px));
     width:calc(100vw - 18px);
     font-size:12px;
-    padding:9px 10px;
+    padding:8px 10px;
   }
-  .mobile-attack{width:82px;height:82px;right:10px;bottom:calc(max(14px,env(safe-area-inset-bottom)) + 18px)}
-  .mobile-dash{width:62px;height:62px;right:102px;bottom:calc(max(14px,env(safe-area-inset-bottom)) + 26px)}
-  .mobile-pull{width:64px;height:64px;right:20px;bottom:calc(max(14px,env(safe-area-inset-bottom)) + 114px)}
-  .mobile-order,.mobile-interact{right:12px;bottom:calc(max(14px,env(safe-area-inset-bottom)) + 192px);width:90px}
+  .dialogue-overlay{align-items:stretch}
+  .dialogue-panel{height:100%;max-height:100%;border-radius:12px}
+  .dialogue-speaker{font-size:15px;padding:12px 14px 9px}
+  .dialogue-body{font-size:14px;padding:11px 14px 13px}
+  .dialogue-choices{padding:9px;gap:7px;max-height:48svh}
+  .dialogue-choice{min-height:44px;font-size:12px}
 }
 
 @media (orientation:landscape) and (max-height:520px){
+  .mobile-joystick-zone{
+    width:40vw;
+    max-width:270px;
+    height:54vh;
+    max-height:240px;
+  }
+  .mobile-joystick-base{width:100px;height:100px}
+  .mobile-attack{
+    width:70px;height:70px;
+    right:10px;
+    bottom:calc(max(8px,env(safe-area-inset-bottom)) + 8px);
+  }
+  .mobile-dash{
+    width:56px;height:56px;
+    right:90px;
+    bottom:calc(max(8px,env(safe-area-inset-bottom)) + 10px);
+  }
+  .mobile-pull{
+    width:58px;height:58px;
+    right:14px;
+    bottom:calc(max(8px,env(safe-area-inset-bottom)) + 86px);
+  }
+  .mobile-order,.mobile-interact{
+    right:10px;
+    bottom:calc(max(8px,env(safe-area-inset-bottom)) + 150px);
+    width:84px;
+    height:40px;
+  }
   .game-toast{
-    top:max(76px,calc(env(safe-area-inset-top) + 64px));
-    width:min(480px,calc(100vw - 180px));
+    top:max(80px,calc(env(safe-area-inset-top) + 68px));
+    width:min(480px,calc(100vw - 190px));
     font-size:11px;
   }
-  .mobile-attack{width:68px;height:68px;right:12px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 8px)}
-  .mobile-dash{width:54px;height:54px;right:88px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 10px)}
-  .mobile-pull{width:56px;height:56px;right:16px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 86px)}
-  .mobile-order,.mobile-interact{right:12px;bottom:calc(max(8px,env(safe-area-inset-bottom)) + 150px);width:84px;height:38px}
+  .dialogue-overlay{align-items:stretch}
+  .dialogue-panel{height:100%;max-height:100%}
+  .dialogue-choices{max-height:52svh}
 }
