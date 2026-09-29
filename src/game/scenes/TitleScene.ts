@@ -57,7 +57,7 @@ export class TitleScene extends Phaser.Scene {
     y += 62;
     this.makeButton('IMPORT SAVE', y, () => this.pickSaveFile(), true);
 
-    this.add.text(width / 2, height - 36, 'v0.3.1 · saves are versioned and exportable', {
+    this.add.text(width / 2, height - 36, 'v0.3.2 · saves are versioned and exportable', {
       fontFamily: 'system-ui, sans-serif',
       fontSize: '11px',
       color: '#6f8992',
