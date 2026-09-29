@@ -6,7 +6,11 @@ export type DialogueSpeakerId =
   | 'harbor-master'
   | 'tavern-keeper'
   | 'provisioner'
-  | 'shipwright';
+  | 'shipwright'
+  | 'elias'
+  | 'nico'
+  | 'maris'
+  | 'perrin';
 
 export interface IntentReply {
   reply: string;
@@ -258,6 +262,58 @@ export function resolveDialogueIntent(
       };
     }
     return { reply: isQuestion ? '“Ask me something about ships and I will probably have an answer.”' : 'The shipwright grunts and goes back to checking a plank edge.' };
+  }
+
+  if (speaker === 'elias') {
+    if (includesAny(text, ['your name', 'who are you', 'name?'])) {
+      return { reply: '“Elias. I work deck when somebody needs another pair of hands and sail when somebody pays enough.”' };
+    }
+    if (includesAny(text, ['wind', 'weather', 'sea', 'east'])) {
+      return { reply: '“Night wind east of here gets pushy from the north. Small boats feel it first.”' };
+    }
+    if (includesAny(text, ['marine', 'patrol', 'inspection'])) {
+      return { reply: '“Patrol boat comes and goes. Midday is when I notice it most.”' };
+    }
+    return { reply: isQuestion ? '“Depends what you want to know. I know docks and weather better than politics.”' : 'Elias gives you a small nod.' };
+  }
+
+  if (speaker === 'nico') {
+    if (includesAny(text, ['your name', 'who are you', 'name?'])) {
+      return { reply: '“Nico. Dockhand. If it comes off a ship heavy, I probably carried it.”' };
+    }
+    if (includesAny(text, ['north road', 'thief', 'thieves', 'trouble'])) {
+      return { reply: '“People coming in from the north road keep talking about thefts. I would not walk it alone after dark.”' };
+    }
+    if (includesAny(text, ['marine', 'patrol'])) {
+      return { reply: '“Marines mostly stay on the outer quay unless they came here looking for someone.”' };
+    }
+    return { reply: isQuestion ? '“I hear things while I work. Ask something specific.”' : 'Nico shifts the coil of rope on his shoulder and listens.' };
+  }
+
+  if (speaker === 'maris') {
+    if (includesAny(text, ['your name', 'who are you', 'name?'])) {
+      return { reply: '“Maris. Coastal trader. I make my money knowing what is worth carrying before everybody else does.”' };
+    }
+    if (includesAny(text, ['north road', 'thief', 'thieves', 'trade', 'route'])) {
+      return { reply: '“The north road is costing traders time lately. Theft rumors make guards expensive.”' };
+    }
+    if (includesAny(text, ['wind', 'weather', 'east'])) {
+      return { reply: '“The evening wind east of Gullrock can shove a light hull south if the navigator gets lazy.”' };
+    }
+    return { reply: isQuestion ? '“Ask about routes, cargo, or who is making travel expensive.”' : 'Maris studies you with the habit of someone pricing risk.' };
+  }
+
+  if (speaker === 'perrin') {
+    if (includesAny(text, ['your name', 'who are you', 'name?'])) {
+      return { reply: '“Perrin. Porter. I move crates and learn who is in a hurry by how much they complain.”' };
+    }
+    if (includesAny(text, ['marine', 'patrol', 'inspection'])) {
+      return { reply: '“When Marines inspect the quay, everybody suddenly remembers where their papers are.”' };
+    }
+    if (includesAny(text, ['north road', 'thief', 'thieves'])) {
+      return { reply: '“Had two merchants come in angry about the north road this week. Missing goods, same story.”' };
+    }
+    return { reply: isQuestion ? '“Maybe I heard something while unloading. What are you asking?”' : 'Perrin keeps one hand on a crate and waits.' };
   }
 
   return { reply: 'No response.' };
