@@ -4,7 +4,7 @@ A private, persistent, consequence-driven pirate RPG built around Alexander Vane
 
 This repository replaces the Floot prototype as the permanent source of truth. Hosting is replaceable; campaign continuity and versioned saves are not.
 
-## Current foundation — v0.3.12
+## Current foundation — v0.3.13
 
 The current vertical slice is built as a complete local loop rather than disconnected demos:
 
@@ -46,8 +46,14 @@ The current vertical slice is built as a complete local loop rather than disconn
 38. Obvious ship orders such as setting a known course or handing the helm to Sera/Alexander are resolved locally at zero API cost when the wording is unambiguous.
 39. Per-turn context is aggressively trimmed: only the most relevant persistent memories and journal events plus the last few dialogue turns are sent, while the response budget is capped for concise NPC speech.
 40. Billing/quota exhaustion is surfaced distinctly in the conversation as “[AI CREDITS EMPTY — local dialogue fallback active]”; invalid/expired API keys use a separate warning so billing problems are not confused with connectivity errors.
+41. Berries are visible during combat, sailing, Gullrock exploration, and the captain journal so the economy is never hidden during ordinary play.
+42. Equipment now has persistent ownership, weapon/armor/tool/accessory slots, compatibility tags, and crew loadouts. The GEAR journal tab lets the player assign or remove owned gear from Alexander or any compatible crew member.
+43. Maris now operates a finite-stock Gullrock gear trade with equipment that has real effects: melee bonuses, damage reduction, and navigator sea-awareness bonuses.
+44. Nico offers a zero-AI paid dock-loading shift. The player physically walks between three visible cargo markers and earns 2,400 berries on completion; the work can be repeated on a later in-world day.
+45. Crew AI quality is no longer keyed only to Sera and Rowan. Any future saved crew identity enters the same economy-first Luna / complex-conversation Sol routing, persistent memory, and relationship-impression pipeline.
+46. Save schema v4 adds equipment and extensible crew capability fields with an explicit v3→v4 migration so existing campaigns remain usable.
 
-Typed freeform dialogue now has a live AI path with structured output, relevance-selected context, prioritized persistent memories, private relationship impressions, economy-first model routing, zero-cost handling for obvious routine ship orders, and a local offline fallback. AI responses may propose only explicitly supported game actions; the simulation validates and applies them.
+Typed freeform dialogue now has a live AI path with structured output, relevance-selected context, prioritized persistent memories, private relationship impressions, economy-first model routing, zero-cost handling for obvious routine ship orders, and a local offline fallback. Economy and equipment remain normal deterministic game systems with zero API cost. AI responses may propose only explicitly supported game actions; the simulation validates and applies them.
 
 ## Development
 
