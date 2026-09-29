@@ -21,6 +21,7 @@ const equipment = read('../src/game/systems/Equipment.ts');
 const pause = read('../src/game/scenes/PauseScene.ts');
 const progression = read('../src/game/systems/Progression.ts');
 const livingWorld = read('../src/game/systems/LivingWorld.ts');
+const canonTimeline = read('../src/game/systems/CanonTimeline.ts');
 const recruitment = read('../src/game/systems/Recruitment.ts');
 const worldClock = read('../src/game/systems/WorldClock.ts');
 const enemyArchetypes = read('../src/game/systems/EnemyArchetypes.ts');
@@ -66,6 +67,9 @@ const checks = [
   ['enemy archetype table contains no random Admiral archetype', !enemyArchetypes.includes("ranks: ['admiral']")],
   ['sailing creates visible contextual encounters', sea.includes('updateSeaEncounter') && sea.includes('Sea encounter:') && sea.includes('encounterShip')],
   ['hostile naval encounters support pursuit and ranged hull damage', sea.includes('chaseSpeed') && sea.includes('Incoming ship fire hits the Gull')],
+  ['boarding is playable deck combat with crew injury and permadeath consequences', sea.includes('beginBoardingCombat') && sea.includes('updateBoardingCombat') && sea.includes('deckAttack') && sea.includes('deckPull') && sea.includes("'overboard-'") && sea.includes("'GameOverScene'")],
+  ['boarding restores stamina using persistent combat progression', sea.includes('18 + combat.staminaRecoveryBonus')],
+  ['campaign-start Admiral registry is explicit', canonTimeline.includes("'sakazuki'") && canonTimeline.includes("'borsalino'") && canonTimeline.includes("'kuzan'") && livingWorld.includes('isTimelineValidAdmiral')],
   ['non-hostile ships can be hailed instead of auto-attacked', sea.includes('openEncounterInteraction') && sea.includes('Hail ship') && sea.includes('Passing Pirate Captain')],
   ['naval command foundation supports distance boarding and defense orders', naval.includes("'keep-distance'") && naval.includes("'close-distance'") && naval.includes("'board-enemy'") && naval.includes("'repel-boarders'") && naval.includes('canBoard')],
   ['Sera can still helm while Alexander moves on deck', sea.includes("NavigationMode = 'manual' | 'sera'") && sea.includes('updateDeckMovement(dt)')],
