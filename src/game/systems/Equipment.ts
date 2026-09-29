@@ -3,7 +3,6 @@ import type { CampaignSave, EquipmentLoadout, EquipmentSlot } from '../state/typ
 export interface EquipmentEffects {
   meleeDamageBonus: number;
   damageReduction: number;
-  maxHpBonus: number;
   seaAwarenessBonus: number;
 }
 
@@ -43,7 +42,7 @@ export const EQUIPMENT: Record<string, EquipmentDefinition> = {
     price: 6_000,
     description: 'Flexible layered protection made for people who still need to move quickly on a wet deck.',
     compatibleTags: ['light-armor', 'medium-armor'],
-    effects: { damageReduction: 2, maxHpBonus: 4 },
+    effects: { damageReduction: 2 },
   },
   'weatherproof-coat': {
     id: 'weatherproof-coat',
@@ -52,7 +51,7 @@ export const EQUIPMENT: Record<string, EquipmentDefinition> = {
     price: 4_800,
     description: 'A reinforced longcoat that keeps spray out and softens minor impacts.',
     compatibleTags: ['light-armor', 'medium-armor'],
-    effects: { damageReduction: 1, maxHpBonus: 6 },
+    effects: { damageReduction: 1 },
   },
   'brass-spyglass': {
     id: 'brass-spyglass',
@@ -91,8 +90,7 @@ export function equippedEffects(loadout: EquipmentLoadout): EquipmentEffects {
   const total: EquipmentEffects = {
     meleeDamageBonus: 0,
     damageReduction: 0,
-    maxHpBonus: 0,
-    seaAwarenessBonus: 0,
+      seaAwarenessBonus: 0,
   };
 
   for (const itemId of Object.values(loadout)) {
@@ -100,7 +98,6 @@ export function equippedEffects(loadout: EquipmentLoadout): EquipmentEffects {
     if (!item) continue;
     total.meleeDamageBonus += item.effects.meleeDamageBonus ?? 0;
     total.damageReduction += item.effects.damageReduction ?? 0;
-    total.maxHpBonus += item.effects.maxHpBonus ?? 0;
     total.seaAwarenessBonus += item.effects.seaAwarenessBonus ?? 0;
   }
 
