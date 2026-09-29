@@ -129,11 +129,64 @@ button,input,textarea{font:inherit}
   border-color:rgba(168,197,206,.65);
 }
 
+
+/* Native crew health overlay: stays readable above the canvas on phone browsers. */
+.crew-status-hud{
+  position:fixed;
+  z-index:1450;
+  left:max(10px,env(safe-area-inset-left));
+  top:76px;
+  width:210px;
+  padding:8px 9px 9px;
+  border:1px solid rgba(157,179,186,.28);
+  border-radius:10px;
+  background:rgba(7,17,22,.90);
+  color:#edf4f6;
+  pointer-events:none;
+  box-shadow:0 6px 20px rgba(0,0,0,.24);
+}
+.crew-status-title{
+  margin-bottom:5px;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.08em;
+  color:#b7c8cd;
+}
+.crew-status-row+ .crew-status-row{margin-top:7px}
+.crew-status-line{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:3px;
+}
+.crew-status-name{font-size:10px;font-weight:800}
+.crew-status-hp{font-size:10px;color:#d5e1e5}
+.crew-status-row[data-state="down"] .crew-status-name,
+.crew-status-row[data-state="down"] .crew-status-hp{color:#ffd3ca}
+.crew-status-track{
+  width:100%;
+  height:7px;
+  overflow:hidden;
+  border-radius:999px;
+  background:#1d2c32;
+}
+.crew-status-fill{
+  height:100%;
+  min-width:0;
+  border-radius:inherit;
+  background:#79bf8b;
+  transition:width .16s ease,background .16s ease;
+}
+.crew-status-fill[data-state="hurt"]{background:#d0a45e}
+.crew-status-fill[data-state="critical"]{background:#c76a62}
+.crew-status-fill[data-state="down"]{background:#667074}
+
 /* Transient messages live below the HUD instead of covering it. */
 .game-toast{
   position:fixed;
   left:50%;
-  top:max(184px,calc(env(safe-area-inset-top) + 172px));
+  top:max(174px,calc(env(safe-area-inset-top) + 162px));
   z-index:1500;
   width:min(520px,calc(100vw - 24px));
   transform:translate(-50%,-8px);
@@ -175,7 +228,7 @@ button,input,textarea{font:inherit}
 }
 .dialogue-panel{
   width:min(720px,100%);
-  max-height:calc(100svh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom)));
+  max-height:calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom)));
   display:flex;
   flex-direction:column;
   overflow:hidden;
@@ -205,6 +258,56 @@ button,input,textarea{font:inherit}
   line-height:1.5;
   white-space:pre-wrap;
 }
+
+.dialogue-line{margin:0 0 12px}
+.dialogue-line:last-child{margin-bottom:0}
+.dialogue-line-player{
+  margin-left:14%;
+  padding:9px 11px;
+  border-radius:10px 10px 2px 10px;
+  background:#17303b;
+  color:#e8f1f3;
+}
+.dialogue-line-npc{
+  margin-right:8%;
+}
+.dialogue-freeform{
+  flex:0 0 auto;
+  display:flex;
+  gap:8px;
+  padding:10px 11px;
+  border-top:1px solid rgba(255,255,255,.10);
+  background:#09151b;
+}
+.dialogue-input{
+  flex:1 1 auto;
+  min-width:0;
+  min-height:48px;
+  max-height:112px;
+  resize:vertical;
+  border:1px solid rgba(157,179,186,.34);
+  border-radius:9px;
+  padding:10px 11px;
+  background:#10232c;
+  color:#edf4f6;
+  outline:none;
+  touch-action:auto;
+  -webkit-user-select:text;
+  user-select:text;
+}
+.dialogue-input:focus{border-color:rgba(216,180,95,.78)}
+.dialogue-input::placeholder{color:#8fa2a8}
+.dialogue-send{
+  flex:0 0 64px;
+  border:0;
+  border-radius:9px;
+  background:#d8b45f;
+  color:#071116;
+  font-weight:900;
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
 .dialogue-choices{
   flex:0 0 auto;
   display:grid;
@@ -257,17 +360,26 @@ button,input,textarea{font:inherit}
     bottom:calc(max(12px,env(safe-area-inset-bottom)) + 188px);
     width:90px;
   }
+  .crew-status-hud{
+    top:max(126px,calc(env(safe-area-inset-top) + 112px));
+    left:max(8px,env(safe-area-inset-left));
+    width:min(218px,calc(100vw - 96px));
+    padding:7px 8px 8px;
+  }
   .game-toast{
-    top:max(176px,calc(env(safe-area-inset-top) + 164px));
+    top:max(220px,calc(env(safe-area-inset-top) + 206px));
     width:calc(100vw - 18px);
     font-size:12px;
     padding:8px 10px;
   }
   .dialogue-overlay{align-items:stretch}
-  .dialogue-panel{height:100%;max-height:100%;border-radius:12px}
+  .dialogue-panel{height:100dvh;max-height:100dvh;border-radius:12px}
   .dialogue-speaker{font-size:15px;padding:12px 14px 9px}
   .dialogue-body{font-size:14px;padding:11px 14px 13px}
-  .dialogue-choices{padding:9px;gap:7px;max-height:48svh}
+  .dialogue-freeform{padding:8px;gap:7px}
+  .dialogue-input{min-height:46px;font-size:14px;padding:9px 10px}
+  .dialogue-send{flex-basis:58px;font-size:12px}
+  .dialogue-choices{padding:9px;gap:7px;max-height:42svh}
   .dialogue-choice{min-height:44px;font-size:12px}
 }
 
@@ -300,12 +412,18 @@ button,input,textarea{font:inherit}
     width:84px;
     height:40px;
   }
+  .crew-status-hud{
+    top:max(84px,calc(env(safe-area-inset-top) + 72px));
+    width:188px;
+  }
   .game-toast{
-    top:max(142px,calc(env(safe-area-inset-top) + 130px));
+    top:max(172px,calc(env(safe-area-inset-top) + 160px));
     width:min(480px,calc(100vw - 190px));
     font-size:11px;
   }
   .dialogue-overlay{align-items:stretch}
-  .dialogue-panel{height:100%;max-height:100%}
-  .dialogue-choices{max-height:52svh}
+  .dialogue-panel{height:100dvh;max-height:100dvh}
+  .dialogue-freeform{padding:7px}
+  .dialogue-input{min-height:40px;max-height:70px}
+  .dialogue-choices{max-height:44svh}
 }

@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
+import { DialoguePanel } from '../systems/DialoguePanel';
+import { resolveDialogueIntent } from '../systems/DialogueIntent';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { Toast } from '../systems/Toast';
@@ -28,6 +30,7 @@ export class SeaScene extends Phaser.Scene {
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private mobile?: MobileControls;
   private toast!: Toast;
+  private dialogue!: DialoguePanel;
   private hud!: Phaser.GameObjects.Text;
   private nav!: Phaser.GameObjects.Text;
   private crewHud!: CrewStatusHud;
@@ -76,17 +79,18 @@ export class SeaScene extends Phaser.Scene {
 
     this.createInput();
     this.toast = new Toast(this);
+    this.dialogue = new DialoguePanel(this);
     this.createHud();
-    this.crewHud = new CrewStatusHud(this, 14, 96);
+    this.crewHud = new CrewStatusHud(this);
 
     if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {
         primary: () => undefined,
         secondary: () => undefined,
         dash: () => undefined,
-        interact: () => this.tryDock(),
+        interact: () => this.contextAction(),
         order: () => this.toggleNavigationMode(),
-        pause: () => this.pauseGame(),
+        pause: () => this.pauseOrCloseDialogue(),
       });
       this.mobile.setCombatVisible(false);
     }
@@ -123,6 +127,8 @@ export class SeaScene extends Phaser.Scene {
       save.ship.supplies = Math.max(0, save.ship.supplies - dt * 0.004);
     }
 
+    const talking = this.dialogue.isOpen();
+
     if (this.navigationMode === 'sera') {
       if (!this.canSeraNavigate()) {
         this.navigationMode = 'manual';
@@ -131,7 +137,7 @@ export class SeaScene extends Phaser.Scene {
         this.applyNavigationPresentation();
       } else {
         this.updateSeraNavigation(dt);
-        this.updateDeckMovement(dt);
+        if (!talking) this.updateDeckMovement(dt);
       }
     } else {
       this.updateManualShip(dt);
@@ -171,9 +177,11 @@ export class SeaScene extends Phaser.Scene {
       pause: Phaser.Input.Keyboard.KeyCodes.ESC,
     }) as Record<string, Phaser.Input.Keyboard.Key>;
 
-    this.keys.dock?.on('down', () => this.tryDock());
-    this.keys.delegate?.on('down', () => this.toggleNavigationMode());
-    this.keys.pause?.on('down', () => this.pauseGame());
+    this.keys.dock?.on('down', () => this.contextAction());
+    this.keys.delegate?.on('down', () => {
+      if (!this.dialogue.isOpen()) this.toggleNavigationMode();
+    });
+    this.keys.pause?.on('down', () => this.pauseOrCloseDialogue());
   }
 
   private getMoveInput(): Phaser.Math.Vector2 {
@@ -494,7 +502,12 @@ export class SeaScene extends Phaser.Scene {
     }
 
     const canDock = Boolean(best && best.d <= best.port.radius && Math.abs(this.speed) <= 65);
-    this.mobile?.setInteract(canDock ? `Dock ${best?.port.name ?? ''}` : null);
+    const talkTarget = this.deckTalkTarget();
+    if (talkTarget) {
+      this.mobile?.setInteract(`Talk ${talkTarget === 'sera' ? 'Sera' : 'Rowan'}`);
+    } else {
+      this.mobile?.setInteract(canDock ? `Dock ${best?.port.name ?? ''}` : null);
+    }
 
     if (
       this.navigationMode === 'sera' &&
@@ -506,6 +519,83 @@ export class SeaScene extends Phaser.Scene {
       this.arrivalNotifiedPortId = best.port.id;
       this.toast.show(`Sera: We're at ${best.port.name}. Give the word and I'll bring us in.`, 3600);
     }
+  }
+
+  private contextAction(): void {
+    if (this.dialogue.isOpen()) return;
+    const target = this.deckTalkTarget();
+    if (target) {
+      this.openCrewConversation(target);
+      return;
+    }
+    this.tryDock();
+  }
+
+  private deckTalkTarget(): 'sera' | 'rowan' | null {
+    if (this.navigationMode !== 'sera' || !this.deck?.visible) return null;
+
+    const save = SaveManager.get();
+    const sera = save.crew.find((member) => member.id === 'sera');
+    const rowan = save.crew.find((member) => member.id === 'rowan');
+
+    const seraDistance = Phaser.Math.Distance.Between(
+      this.deckPlayerLocal.x,
+      this.deckPlayerLocal.y,
+      0,
+      -80,
+    );
+    const rowanDistance = Phaser.Math.Distance.Between(
+      this.deckPlayerLocal.x,
+      this.deckPlayerLocal.y,
+      48,
+      22,
+    );
+
+    const candidates: Array<{ id: 'sera' | 'rowan'; distance: number }> = [];
+    if (sera && sera.hp > 0 && seraDistance <= 72) candidates.push({ id: 'sera', distance: seraDistance });
+    if (rowan && rowan.hp > 0 && rowanDistance <= 72) candidates.push({ id: 'rowan', distance: rowanDistance });
+    candidates.sort((a, b) => a.distance - b.distance);
+    return candidates[0]?.id ?? null;
+  }
+
+  private openCrewConversation(id: 'sera' | 'rowan'): void {
+    const save = SaveManager.get();
+    const member = save.crew.find((candidate) => candidate.id === id);
+    if (!member || member.hp <= 0) return;
+
+    this.mobile?.setVisible(false);
+    const speaker = id === 'sera' ? 'Sera Quill' : 'Rowan Vale';
+    const opening = id === 'sera'
+      ? 'Sera keeps one hand near the helm and glances over. “I can listen. The course is steady.”'
+      : 'Rowan leans against the rail. “What is it?”';
+
+    this.dialogue.show({
+      speaker,
+      text: opening,
+      choices: [{ label: 'End conversation', run: () => undefined }],
+      freeform: {
+        placeholder: `Say anything to ${speaker}...`,
+        onSubmit: (message) => {
+          const current = SaveManager.get();
+          current.world.flags[`talkedTo-${id}`] = true;
+          const result = resolveDialogueIntent(id, message, current);
+          SaveManager.save();
+          return result.reply;
+        },
+      },
+      onClose: () => {
+        this.mobile?.setVisible(true);
+        SaveManager.save();
+      },
+    });
+  }
+
+  private pauseOrCloseDialogue(): void {
+    if (this.dialogue.isOpen()) {
+      this.dialogue.close();
+      return;
+    }
+    this.pauseGame();
   }
 
   private tryDock(): void {

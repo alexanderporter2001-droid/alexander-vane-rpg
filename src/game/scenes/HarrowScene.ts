@@ -162,7 +162,7 @@ export class HarrowScene extends Phaser.Scene {
     this.createInput();
     this.toast = new Toast(this);
     this.createHud();
-    this.crewHud = new CrewStatusHud(this, 14, 84);
+    this.crewHud = new CrewStatusHud(this);
 
     if (shouldUseMobileControls()) {
       this.mobile = new MobileControls(this, {

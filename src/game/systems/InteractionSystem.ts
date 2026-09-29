@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
 
+type Coordinate = number | (() => number);
+
 export interface Interaction {
   id: string;
-  x: number;
-  y: number;
+  x: Coordinate;
+  y: Coordinate;
   radius: number;
   label: string;
   enabled?: () => boolean;
@@ -23,14 +25,20 @@ export class InteractionSystem {
   update(): Interaction | null {
     let best: Interaction | null = null;
     let bestDistance = Infinity;
+
     for (const item of this.items) {
       if (item.enabled && !item.enabled()) continue;
-      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, item.x, item.y);
+
+      const x = typeof item.x === 'function' ? item.x() : item.x;
+      const y = typeof item.y === 'function' ? item.y() : item.y;
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y);
+
       if (d <= item.radius && d < bestDistance) {
         best = item;
         bestDistance = d;
       }
     }
+
     this.current = best;
     return best;
   }

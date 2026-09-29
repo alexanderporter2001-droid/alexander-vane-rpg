@@ -13,6 +13,12 @@ export class BootScene extends Phaser.Scene {
     this.makeCharacter('sera', 0xc98e66, 0x315b72, 0xa13d52, 'navigator');
     this.makeCharacter('rowan', 0x9d6b4b, 0x2c3135, 0x9c3838, 'fighter');
     this.makeCharacter('marine', 0xd9b38c, 0xe6eef1, 0x315f8d, 'marine');
+    this.makeCharacter('npc-tavern', 0xb87958, 0x6f3c2d, 0xd6aa55, 'tavern');
+    this.makeCharacter('npc-harbor', 0xb99162, 0x314c5a, 0xc49c5f, 'harbor');
+    this.makeCharacter('npc-provisioner', 0x8e664e, 0x4f6f4f, 0xc9b070, 'provisioner');
+    this.makeCharacter('npc-shipwright', 0x9c7158, 0x4d5150, 0xb8773d, 'shipwright');
+    this.makeCharacter('npc-dockhand', 0x9f6e4f, 0x40515a, 0x7c8c93, 'dockhand');
+    this.makeCharacter('npc-sailor', 0xc28b67, 0x5b4635, 0x3c6d83, 'sailor');
     this.makeShip();
     this.makeProp('crate', 0x74512f, 44, 44);
     this.makeProp('barrel', 0x805b31, 38, 44);
@@ -44,9 +50,32 @@ export class BootScene extends Phaser.Scene {
       g.lineStyle(4, 0xbfc6ca, 1);
       g.beginPath().moveTo(10, 60).lineTo(1, 78).lineTo(8, 88).strokePath();
       g.beginPath().moveTo(62, 60).lineTo(71, 78).lineTo(64, 88).strokePath();
-    } else {
+    } else if (role === 'marine') {
       g.fillStyle(0xf6f8f9, 1).fillEllipse(36, 21, 38, 15);
       g.fillStyle(0x315f8d, 1).fillRect(17, 25, 38, 6);
+    } else if (role === 'tavern') {
+      g.fillStyle(0x3b241b, 1).fillEllipse(36, 22, 35, 20);
+      g.fillStyle(0xe5d0a2, 1).fillRoundedRect(23, 53, 26, 28, 4);
+      g.fillStyle(0x7f5431, 1).fillCircle(58, 61, 5);
+    } else if (role === 'harbor') {
+      g.fillStyle(0x24343c, 1).fillEllipse(36, 22, 36, 16);
+      g.fillStyle(0xc49c5f, 1).fillRect(20, 27, 32, 5);
+      g.lineStyle(3, 0xe4d2a9, 1).strokeRoundedRect(52, 55, 12, 16, 2);
+    } else if (role === 'provisioner') {
+      g.fillStyle(0x6e5434, 1).fillTriangle(18, 24, 54, 24, 36, 9);
+      g.fillStyle(0x8b633a, 1).fillRoundedRect(48, 49, 15, 31, 4);
+      g.lineStyle(2, 0xd3b77a, 1).strokeRoundedRect(48, 49, 15, 31, 4);
+    } else if (role === 'shipwright') {
+      g.fillStyle(0x7a3a28, 1).fillRect(18, 19, 36, 7);
+      g.fillStyle(0x46362b, 1).fillRect(55, 52, 5, 31);
+      g.fillStyle(0xb8773d, 1).fillRoundedRect(50, 48, 16, 8, 2);
+    } else if (role === 'dockhand') {
+      g.fillStyle(0x60422f, 1).fillEllipse(36, 22, 31, 16);
+      g.lineStyle(3, 0x9ca8ad, 1).strokeLineShape(new Phaser.Geom.Line(60, 49, 66, 80));
+    } else if (role === 'sailor') {
+      g.fillStyle(0xe6dfcf, 1).fillEllipse(36, 21, 36, 14);
+      g.fillStyle(0x3c6d83, 1).fillRect(18, 24, 36, 5);
+      g.fillStyle(0x8b2f35, 1).fillTriangle(12, 54, 4, 73, 22, 68);
     }
 
     g.generateTexture(key, 72, 104);
