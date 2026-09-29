@@ -188,6 +188,11 @@ export class SeaScene extends Phaser.Scene {
     if (this.boardingActive) {
       this.speed = 0;
       this.ship.setVelocity(0, 0);
+      const combat = playerCombatStats(save);
+      save.player.stamina = Math.min(
+        save.player.maxStamina,
+        save.player.stamina + (18 + combat.staminaRecoveryBonus) * dt,
+      );
       if (!talking) {
         this.updateDeckMovement(dt);
         if (Phaser.Input.Keyboard.JustDown(this.keys.attack!)) this.deckAttack();
