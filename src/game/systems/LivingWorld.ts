@@ -30,7 +30,8 @@ const islandB = ['reach', 'rock', 'haven', 'fall', 'key', 'rest', 'watch', 'shoa
 const geography = ['high cliffs', 'mangrove shallows', 'black-sand coves', 'wind-cut hills', 'dense cedar forest', 'limestone caves', 'wide tidal flats', 'steep volcanic ridges'] as const;
 const resources = ['timber', 'iron sand', 'medicinal herbs', 'fish', 'stone', 'fruit orchards', 'ship timber', 'salt'] as const;
 const opportunities = ['dock work', 'bounty leads', 'merchant contracts', 'underground fights', 'treasure rumors', 'local investigations', 'escort work', 'ship repairs', 'recruitment leads'] as const;
-const situations = ['missing-cargo', 'local-feud', 'pirate-shore-leave', 'marine-inspection', 'wreck-rumor', 'merchant-dispute', 'road-bandits', 'strange-tide'] as const;
+const situations = ['missing-cargo', 'local-feud', 'pirate-shore-leave', 'marine-inspection', 'wreck-rumor', 'merchant-dispute', 'road-bandits', 'strange-tide', 'crew-feud', 'labor-dispute', 'bounty-search'] as const;
+const islandIdentities = ['trade-port', 'frontier-settlement', 'government-port', 'pirate-haven', 'resource-island', 'isolated-community'] as const;
 
 function pick<T>(items: readonly T[], seed: number, salt: number): T {
   return items[Math.min(items.length - 1, Math.floor(unit(seed, salt) * items.length))]!;
@@ -79,6 +80,34 @@ export function ensureGeneratedIsland(save: CampaignSave, id: string, nameHint?:
     resolvedSituations: [],
     lastSimulatedDay: save.world.day,
   };
+
+  const identity = pick(islandIdentities, seed, 10);
+  island.notableTraits = [identity.replace(/-/g, ' '), pick(geography, seed, 11)];
+  if (identity === 'trade-port') {
+    island.prosperity = Math.max(island.prosperity, 0.58);
+    island.opportunities = ['merchant contracts', 'ship repairs', 'dock work', 'rumor trading'];
+    island.resources = ['coastal trade', pick(resources, seed, 12)];
+  } else if (identity === 'government-port') {
+    island.marinePresence = Math.max(island.marinePresence, 0.7);
+    island.governmentImportance = Math.max(island.governmentImportance ?? 0, 0.72);
+    island.opportunities = ['official cargo work', 'investigations', 'bounty leads', 'inspection evasion'];
+  } else if (identity === 'pirate-haven') {
+    island.piratePresence = Math.max(island.piratePresence, 0.68);
+    island.marinePresence = Math.min(island.marinePresence, 0.38);
+    island.danger = Math.max(island.danger, 0.55);
+    island.opportunities = ['underground fights', 'treasure rumors', 'black-market trade', 'recruitment leads'];
+  } else if (identity === 'resource-island') {
+    island.resources = [pick(resources, seed, 13), pick(resources, seed, 14), pick(resources, seed, 15)];
+    island.opportunities = ['labor contracts', 'merchant contracts', 'local investigations'];
+  } else if (identity === 'frontier-settlement') {
+    island.population = Math.min(island.population, 1400);
+    island.danger = Math.max(island.danger, 0.48);
+    island.opportunities = ['escort work', 'bounty leads', 'road-bandits', 'recruitment leads'];
+  } else {
+    island.population = Math.min(island.population, 800);
+    island.marinePresence = Math.min(island.marinePresence, 0.28);
+    island.opportunities = ['local investigations', 'unique craft trade', 'rumors', 'personal disputes'];
+  }
 
   if (island.marinePresence > 0.55) island.factions.push(name + ' Marine detachment');
   if (island.piratePresence > 0.45) island.factions.push('Independent pirate crews');
@@ -156,6 +185,7 @@ function dispositionFor(
     return roll < 0.12 ? 'wary' : 'neutral';
   }
   if (kind === 'pirate') {
+    if ((save.world.threatHeat >= 3 || save.player.bounty >= 30_000_000) && roll < 0.08) return 'afraid';
     if (roll < 0.12) return 'friendly';
     if (roll < 0.53) return 'neutral';
     if (roll < 0.8) return 'wary';
@@ -184,10 +214,22 @@ export function createEncounter(
             : kindRoll < 0.95 ? 'bounty-hunter'
               : 'criminal';
 
-  const recognizedBase = save.player.bounty >= 10_000_000 ? 0.42 : save.player.bounty >= 5_000_000 ? 0.19 : 0.08;
+  const recognizedBase = save.player.bounty >= 30_000_000
+    ? 0.4
+    : save.player.bounty >= 10_000_000
+      ? 0.15
+      : save.player.bounty >= 5_000_000
+        ? 0.05
+        : 0.015;
   const recognitionChance = clamp01(recognizedBase + save.world.threatHeat * 0.035 + (island?.marinePresence ?? 0) * 0.08);
   const recognized = unit(seed, 20) < recognitionChance;
-  const persistentGroupId = null;
+  const matchingGroups = Object.values(save.world.knownGroups)
+    .filter((group) => group.alive)
+    .filter((group) => group.kind === kind || ((kind === 'merchant' || kind === 'traveler') && group.kind === 'civilian'));
+  const recurringGroup = matchingGroups.length > 0 && unit(seed, 21) < 0.28
+    ? matchingGroups[Math.floor(unit(seed, 23) * matchingGroups.length)]
+    : undefined;
+  const persistentGroupId = recurringGroup?.id ?? null;
   const disposition = dispositionFor(save, kind, seed, recognized, persistentGroupId);
   const rank = kind === 'merchant' || kind === 'traveler'
     ? 'civilian'
