@@ -123,8 +123,8 @@ export class SeaScene extends Phaser.Scene {
       pause: Phaser.Input.Keyboard.KeyCodes.ESC,
     }) as Record<string, Phaser.Input.Keyboard.Key>;
 
-    this.keys.dock.on('down', () => this.tryDock());
-    this.keys.pause.on('down', () => this.pauseGame());
+    this.keys.dock?.on('down', () => this.tryDock());
+    this.keys.pause?.on('down', () => this.pauseGame());
   }
 
   private updateShip(dt: number): void {
@@ -305,8 +305,8 @@ export class SeaScene extends Phaser.Scene {
       for (let x = 30; x < this.worldW; x += 130) {
         waves.beginPath();
         waves.moveTo(x, y);
-        waves.quadraticBezierTo(x + 28, y - 9, x + 56, y);
-        waves.quadraticBezierTo(x + 84, y + 9, x + 112, y);
+        waves.lineTo(x + 56, y);
+        waves.lineTo(x + 112, y);
         waves.strokePath();
       }
     }
@@ -323,8 +323,7 @@ export class SeaScene extends Phaser.Scene {
       fontFamily: 'system-ui, sans-serif',
       fontSize: '12px',
       color: '#d7edef',
-      alpha: 0.55,
-    }).setOrigin(0.5).setDepth(-7);
+    }).setOrigin(0.5).setAlpha(0.55).setDepth(-7);
   }
 
   private drawIsland(x: number, y: number, radius: number, color: number, label: string): void {
