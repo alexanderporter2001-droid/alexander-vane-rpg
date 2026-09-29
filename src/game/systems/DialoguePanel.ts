@@ -94,7 +94,6 @@ export class DialoguePanel {
       items,
     ).setScrollFactor(0).setDepth(3600);
 
-    this.scene.input.keyboard?.once('keydown-ESC', () => this.close());
   }
 
   close(invokeHandler = true): void {
