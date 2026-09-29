@@ -47,6 +47,17 @@ const checks = [
   ['Gullrock service NPCs use character sprites', boot.includes("'npc-tavern'") && boot.includes("'npc-harbor'") && boot.includes("'npc-provisioner'") && boot.includes("'npc-shipwright'")],
   ['Gullrock no longer uses service NPC circles', !gullrock.includes("this.add.circle(405, 500") && !gullrock.includes("this.add.circle(575, 560")],
   ['Gullrock has environmental market detail', gullrock.includes('Market stalls') && gullrock.includes('Non-interactive locals')],
+  ['land cameras use a deadzone', harrow.includes('setDeadzone') && gullrock.includes('setDeadzone')],
+  ['crew health panel is reduced in size', style.includes('width:184px') && style.includes('height:5px')],
+  ['Gullrock service NPCs have names', gullrock.includes('Dren Pike — Harbor Master') && gullrock.includes('Marta Vell — Tavern Keeper') && gullrock.includes('Toma Reed — Provisioner') && gullrock.includes('Brann Cale — Shipwright')],
+  ['background Gullrock locals have names', gullrock.includes('Elias — Sailor') && gullrock.includes('Nico — Dockhand') && gullrock.includes('Maris — Coastal Trader') && gullrock.includes('Perrin — Porter')],
+  ['ports have offshore approach points', sea.includes('approachX') && sea.includes('approachY') && sea.includes('dockX') && sea.includes('dockY')],
+  ['Sera stops offshore before docking', sea.includes('enterArrivalApproach') && sea.includes('holding offshore')],
+  ['deck view is hidden for final harbor approach', sea.includes('const deckMode = delegated && !this.arrivalReady')],
+  ['docking has its own sequence', sea.includes('beginDockingSequence') && sea.includes('duration: 1600')],
+  ['ships are blocked from entering island land', sea.includes('isInsideIslandLand(nextX, nextY, port)')],
+  ['harbor approach markers are rendered', sea.includes('drawHarborApproach')],
+  ['named NPCs can introduce themselves', intent.includes('Dren Pike') && intent.includes('Marta Vell') && intent.includes('Toma Reed') && intent.includes('Brann Cale')],
 ];
 
 let failures = 0;
