@@ -57,7 +57,7 @@ export class TitleScene extends Phaser.Scene {
     y += 62;
     this.makeButton('IMPORT SAVE', y, () => this.pickSaveFile(), true);
 
-    this.add.text(width / 2, height - 36, 'v0.3.8 · stable camera & harbor arrivals', {
+    this.add.text(width / 2, height - 36, 'v0.3.9 · AI dialogue online', {
       fontFamily: 'system-ui, sans-serif',
       fontSize: '11px',
       color: '#6f8992',
