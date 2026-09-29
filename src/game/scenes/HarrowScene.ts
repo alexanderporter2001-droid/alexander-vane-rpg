@@ -718,7 +718,7 @@ export class HarrowScene extends Phaser.Scene {
     target.setTintFill(0xffffff);
     this.time.delayedCall(80, () => {
       if (!target.active) return;
-      if (target.getData('down')) target.setTint(0x3e474b);
+      if (target.getData('downed')) target.setTint(0x555b5f);
       else target.clearTint();
     });
   }
