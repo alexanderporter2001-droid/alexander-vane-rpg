@@ -19,7 +19,6 @@ interface EnemyUnit {
   patrolY: number;
   phase: number;
   windup?: Phaser.GameObjects.Arc;
-  downMarker?: Phaser.GameObjects.Text;
 }
 
 interface CrewUnit {
@@ -53,7 +52,6 @@ export class HarrowScene extends Phaser.Scene {
   private dashReadyAt = 0;
   private dashUntil = 0;
   private lastValid = new Phaser.Math.Vector2(720, 870);
-  private lastFacing = new Phaser.Math.Vector2(1, 0);
   private dead = false;
   private lastSaveAt = 0;
 
@@ -92,7 +90,7 @@ export class HarrowScene extends Phaser.Scene {
     ];
     for (const unit of this.crew) {
       unit.sprite.setBodySize(32, 28).setOffset(20, 72).setCollideWorldBounds(true);
-      const title = unit.id === 'sera' ? 'SERA QUILL' : 'ROWAN VALE';
+      const title = unit.id === 'sera' ? 'SERA QUILL · Navigator' : 'ROWAN VALE · Fighter';
       unit.label = this.add.text(unit.sprite.x, unit.sprite.y - 58, title, {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '11px',
@@ -146,7 +144,6 @@ export class HarrowScene extends Phaser.Scene {
         unit.hp = Math.max(0, unit.hp - 10);
         if (unit.hp <= 0) this.markCrewDown(unit);
         else this.hitFlash(unit.sprite);
-        if (unit.hp <= 0) this.downCrew(unit);
       });
     }
 
@@ -486,7 +483,7 @@ export class HarrowScene extends Phaser.Scene {
     for (const enemy of this.enemies) {
       if (enemy.hp <= 0) continue;
       const to = new Phaser.Math.Vector2(enemy.sprite.x - this.player.x, enemy.sprite.y - this.player.y);
-      if (to.length() > 80) continue;
+      if (to.length() > (this.mobile ? 86 : 80)) continue;
       if (to.clone().normalize().dot(facing) < -0.08) continue;
       enemy.alert = true;
       enemy.hp -= 26;
@@ -497,7 +494,7 @@ export class HarrowScene extends Phaser.Scene {
 
   private getAttackFacing(): Phaser.Math.Vector2 {
     const input = this.getMove();
-    if (input.lengthSq() > 0.02) return input.normalize();
+    const movingFacing = input.lengthSq() > 0.02 ? input.clone().normalize() : null;
 
     if (this.mobile) {
       const nearby = this.enemies
@@ -511,17 +508,20 @@ export class HarrowScene extends Phaser.Scene {
             enemy.sprite.y,
           ),
         }))
-        .filter((entry) => entry.distance <= 96)
+        .filter((entry) => entry.distance <= 100)
         .sort((a, b) => a.distance - b.distance)[0];
 
       if (nearby) {
-        return new Phaser.Math.Vector2(
+        const toward = new Phaser.Math.Vector2(
           nearby.enemy.sprite.x - this.player.x,
           nearby.enemy.sprite.y - this.player.y,
         ).normalize();
+
+        if (!movingFacing || toward.dot(movingFacing) >= -0.2) return toward;
       }
     }
 
+    if (movingFacing) return movingFacing;
     return this.lastFacing.clone().normalize();
   }
 
@@ -762,9 +762,8 @@ export class HarrowScene extends Phaser.Scene {
 
   private syncCrewLabels(): void {
     for (const unit of this.crew) {
-      const yOffset = unit.id === 'sera' ? 62 : 48;
       unit.label
-        ?.setPosition(unit.sprite.x, unit.sprite.y - yOffset)
+        ?.setPosition(unit.sprite.x, unit.sprite.y - 64)
         .setAlpha(1);
     }
   }
