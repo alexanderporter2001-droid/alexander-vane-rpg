@@ -996,6 +996,9 @@ export class GullrockScene extends Phaser.Scene {
 
   private pauseGame(): void {
     SaveManager.save();
+    this.hud.setVisible(false);
+    this.crewHud.setVisible(false);
+    this.mobile?.setVisible(false);
     this.scene.launch('PauseScene', { source: this.scene.key });
     this.scene.pause();
   }
@@ -1042,15 +1045,8 @@ export class GullrockScene extends Phaser.Scene {
 
   private updateHud(): void {
     const save = SaveManager.get();
-    this.hud.setText([
-      'Gullrock Port',
-      formatWorldTime(save),
-      `Berries ${save.player.berries.toLocaleString()}`,
-      `Gull hull ${Math.ceil(save.ship.hull)}/${save.ship.maxHull} · Supplies ${Math.floor(save.ship.supplies)}`,
-      this.mobile
-        ? 'Use INTERACT near people and objects'
-        : 'F near people and objects',
-    ]);
+    this.hud.setText([`Gullrock Port`, `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp}`]);
+    this.crewHud.setVisible(false);
     this.crewHud.update(save.crew.map((member) => ({
       id: member.id,
       name: member.name,
