@@ -1,3 +1,5 @@
+import Phaser from 'phaser';
+
 export interface DialogueChoice {
   label: string;
   run: () => void;
@@ -15,8 +17,8 @@ export class DialoguePanel {
   private root: HTMLDivElement | null = null;
   private closeHandler: (() => void) | undefined;
 
-  constructor(private scene: { events: { once: (event: string, callback: () => void) => void } }) {
-    scene.events.once('shutdown', () => this.close(false));
+  constructor(private scene: Phaser.Scene) {
+    scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.close(false));
   }
 
   isOpen(): boolean {
