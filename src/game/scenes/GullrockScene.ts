@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
 import { DialoguePanel, type DialogueChoice } from '../systems/DialoguePanel';
-import { resolveDialogueIntent, type DialogueSpeakerId } from '../systems/DialogueIntent';
+import type { DialogueSpeakerId } from '../systems/DialogueIntent';
+import { resolveDialogueAI } from '../systems/DialogueAI';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
@@ -289,11 +290,14 @@ export class GullrockScene extends Phaser.Scene {
       freeform: intentSpeaker
         ? {
             placeholder: `Say anything to ${speaker}...`,
-            onSubmit: (message) => {
+            onSubmit: async (message, history) => {
               const save = SaveManager.get();
               advanceWorldMinutes(save, 1);
               save.world.flags[`talkedTo-${intentSpeaker}`] = true;
-              const result = resolveDialogueIntent(intentSpeaker, message, save);
+              const result = await resolveDialogueAI(intentSpeaker, message, save, history);
+              if (result.action?.type === 'set_course' && intentSpeaker === 'sera') {
+                save.world.flags.shipDestination = result.action.target;
+              }
               SaveManager.save();
               return result.reply;
             },
