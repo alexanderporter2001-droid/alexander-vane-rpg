@@ -4,7 +4,7 @@ A private, persistent, consequence-driven pirate RPG built around Alexander Vane
 
 This repository replaces the Floot prototype as the permanent source of truth. Hosting is replaceable; campaign continuity and versioned saves are not.
 
-## Current foundation — v0.3.1
+## Current foundation — v0.3.2
 
 The current vertical slice is built as a complete local loop rather than disconnected demos:
 
@@ -19,7 +19,7 @@ The current vertical slice is built as a complete local loop rather than disconn
 9. Real sailing using persistent world coordinates, heading, speed, reefs, and reachable destinations.
 10. Docking at Gullrock Port and continuing on foot.
 11. Pause-only journal/objectives, campaign overview, save/export/import.
-12. Global permadeath routing so an ended campaign cannot silently resume.
+12. Global permadeath routing so an ended campaign cannot silently resume.\n13. Gullrock now has persistent dialogue choices, paid services, ship repair, crew meals, local information, and world-time consequences.
 
 The old fake freeform-intent control is intentionally absent. It returns only when typed intent can resolve into real dialogue, orders, or world actions.
 
