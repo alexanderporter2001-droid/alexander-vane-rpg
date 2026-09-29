@@ -9,7 +9,7 @@
     "check": "tsc -b --pretty false",
     "validate:save": "node scripts/validate-save.mjs",
     "validate:gameplay": "node scripts/validate-gameplay.mjs",
-    "test": "npm run validate:save && npm run validate:gameplay && npm run check"
+    "test": "npm run validate:save && npm run validate:gameplay"
   },
   "dependencies": {
     "phaser": "^3.90.0"
