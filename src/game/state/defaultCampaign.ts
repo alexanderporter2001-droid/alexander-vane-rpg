@@ -1,6 +1,6 @@
 import type { CampaignSave } from './types';
 
-export const GAME_VERSION = '0.3.3';
+export const GAME_VERSION = '0.3.4';
 export const SAVE_VERSION = 3 as const;
 
 export function createDefaultCampaign(): CampaignSave {
