@@ -305,7 +305,7 @@ export class HarrowScene extends Phaser.Scene {
     save.player.position = { x: this.player.x, y: this.player.y };
   }
 
-  private updateEnemies(dt: number): void {
+  private updateEnemies(_dt: number): void {
     const save = SaveManager.get();
 
     for (const enemy of this.enemies) {
