@@ -7,7 +7,7 @@ import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { equippedEffects } from '../systems/Equipment';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { Toast } from '../systems/Toast';
-import { advanceWorldClock, advanceWorldMinutes, formatWorldTime } from '../systems/WorldClock';
+import { advanceWorldClock, advanceWorldMinutes } from '../systems/WorldClock';
 import { createEncounter, ensureKnownGroup } from '../systems/LivingWorld';
 import { crewCombatStats, fruitStats, playerCombatStats, recordCombatExperience, recordCrewExperience, recordFruitUse } from '../systems/Progression';
 
@@ -1448,7 +1448,7 @@ export class SeaScene extends Phaser.Scene {
     save.player.stamina = save.player.maxStamina;
     SaveManager.save();
     this.shipArea = 'deck';
-    this.toast.show(message + ' ' + formatWorldTime(save) + '.', 3600);
+    this.toast.show(message, 3600);
   }
 
   private advanceVoyageByMinutes(minutes: number): void {
