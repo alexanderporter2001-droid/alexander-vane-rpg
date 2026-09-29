@@ -58,6 +58,7 @@ export class HarrowScene extends Phaser.Scene {
   private lastValid = new Phaser.Math.Vector2(720, 870);
   private dead = false;
   private lastSaveAt = 0;
+  private damageGraceUntil = 0;
 
   constructor() { super('HarrowScene'); }
 
@@ -138,7 +139,7 @@ export class HarrowScene extends Phaser.Scene {
       const bullet = raw as Phaser.Physics.Arcade.Image;
       if (!bullet.active) return;
       bullet.disableBody(true, true);
-      this.damagePlayer(12);
+      this.damagePlayer(9);
     });
     for (const unit of this.crew) {
       this.physics.add.overlap(unit.sprite, this.bullets, (_p, raw) => {
@@ -395,7 +396,7 @@ export class HarrowScene extends Phaser.Scene {
       arc.destroy();
       if (enemy.hp <= 0 || this.dead) return;
       const d = Phaser.Math.Distance.Between(enemy.sprite.x, enemy.sprite.y, this.player.x, this.player.y);
-      if (d <= 62 && this.time.now >= this.dashUntil) this.damagePlayer(15);
+      if (d <= 62 && this.time.now >= this.dashUntil) this.damagePlayer(11);
     });
   }
 
@@ -667,6 +668,8 @@ export class HarrowScene extends Phaser.Scene {
   }
 
   private damagePlayer(amount: number): void {
+    if (this.time.now < this.damageGraceUntil) return;
+    this.damageGraceUntil = this.time.now + 240;
     const save = SaveManager.get();
     const reduction = equippedEffects(save.player.equipment).damageReduction;
     save.player.hp = Math.max(0, save.player.hp - Math.max(1, amount - reduction));
