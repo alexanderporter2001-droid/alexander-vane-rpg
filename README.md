@@ -4,20 +4,22 @@ A private, persistent, consequence-driven pirate RPG built around Alexander Vane
 
 This repository replaces the Floot prototype as the permanent source of truth. Hosting is replaceable; campaign continuity and versioned saves are not.
 
-## Current foundation — v0.3.0
+## Current foundation — v0.3.1
 
-The current vertical slice is designed as a complete local loop rather than a collection of disconnected demos:
+The current vertical slice is built as a complete local loop rather than disconnected demos:
 
-1. Context-first Harrow Island opening.
-2. On-foot movement with water/edge collision.
-3. Marines begin unaware and detect by distance.
-4. Readable melee/rifle attacks and physical projectiles.
-5. Real-time pull ability affecting Marines and environmental props.
-6. Autonomous Sera/Rowan support plus broad captain orders.
-7. Contextual boarding of the Wayward Gull.
-8. Real sailing using persistent world coordinates, heading, speed, reefs, and a reachable destination.
-9. Docking at Gullrock Port and continuing on foot.
-10. Pause-only objectives/journal, save/export, crew/ship/inventory views.
+1. Proper title screen with Continue, New Campaign, and Import Save.
+2. Context-first Harrow Island opening.
+3. On-foot movement with water/edge collision.
+4. Marines begin unaware and detect by distance.
+5. Readable melee/rifle attacks and physical projectiles.
+6. Real-time pull ability affecting Marines and environmental props.
+7. Autonomous Sera/Rowan support plus broad captain orders.
+8. Contextual boarding of the Wayward Gull.
+9. Real sailing using persistent world coordinates, heading, speed, reefs, and reachable destinations.
+10. Docking at Gullrock Port and continuing on foot.
+11. Pause-only journal/objectives, campaign overview, save/export/import.
+12. Global permadeath routing so an ended campaign cannot silently resume.
 
 The old fake freeform-intent control is intentionally absent. It returns only when typed intent can resolve into real dialogue, orders, or world actions.
 
