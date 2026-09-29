@@ -39,13 +39,12 @@ export class GullrockScene extends Phaser.Scene {
     this.player.setBodySize(34, 30).setOffset(19, 70);
     this.lastValid.set(savedSpawn.x, savedSpawn.y);
 
-    this.crew = [
-      this.physics.add.sprite(665, 825, 'sera').setDepth(48).setCollideWorldBounds(true),
-      this.physics.add.sprite(785, 825, 'rowan').setDepth(49).setCollideWorldBounds(true),
-    ];
+    const sera = this.physics.add.sprite(665, 825, 'sera').setDepth(48).setCollideWorldBounds(true);
+    const rowan = this.physics.add.sprite(785, 825, 'rowan').setDepth(49).setCollideWorldBounds(true);
+    this.crew = [sera, rowan];
     this.crewLabels = [
-      this.makeCrewLabel(this.crew[0], 'SERA QUILL · Navigator', '#d6edf6'),
-      this.makeCrewLabel(this.crew[1], 'ROWAN VALE · Fighter', '#f0d9cb'),
+      this.makeCrewLabel(sera, 'SERA QUILL · Navigator', '#d6edf6'),
+      this.makeCrewLabel(rowan, 'ROWAN VALE · Fighter', '#f0d9cb'),
     ];
 
     this.dialogue = new DialoguePanel(this);
