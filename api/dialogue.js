@@ -219,6 +219,21 @@ function sanitizeContext(context) {
       }
     : null;
 
+  const conversationParticipants = Array.isArray(source.conversationParticipants)
+    ? source.conversationParticipants.slice(0, 2).map((participant) => ({
+        id: cleanText(participant?.id, 40),
+        name: cleanText(participant?.name, 80),
+        role: cleanText(participant?.role, 80),
+        notes: Array.isArray(participant?.notes)
+          ? participant.notes.slice(0, 5).map((note) => cleanText(note, 160)).filter(Boolean)
+          : [],
+        capabilities: Array.isArray(participant?.capabilities)
+          ? participant.capabilities.slice(0, 6).map((capability) => cleanText(capability, 60)).filter(Boolean)
+          : [],
+        relevance: cleanText(participant?.relevance, 120),
+      })).filter((participant) => participant.id && participant.name && participant.relevance)
+    : [];
+
   return {
     location: cleanText(source.location, 80),
     day: Number.isFinite(source.day) ? source.day : 1,
@@ -226,6 +241,7 @@ function sanitizeContext(context) {
     destination: cleanText(source.destination, 40),
     sailingDelegated: source.sailingDelegated !== false,
     crewIdentity,
+    conversationParticipants,
     ship: source.ship && typeof source.ship === 'object' ? {
       name: cleanText(source.ship.name, 40),
       hull: Number(source.ship.hull) || 0,
@@ -477,7 +493,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({
       ok: true,
-      service: 'alexander-vane-dialogue-v0.3.13',
+      service: 'alexander-vane-dialogue-v0.3.14',
       configured: Boolean(process.env.OPENAI_API_KEY),
       economyModel: process.env.OPENAI_WORLD_MODEL || 'gpt-6-luna',
       deepModel: process.env.OPENAI_CREW_MODEL || 'gpt-6-sol',
@@ -526,7 +542,7 @@ export default async function handler(req, res) {
   const model = pickModel(speakerId, message, context, history);
 
   const instructions = [
-    'You are simulating exactly one NPC in a persistent pirate RPG. Stay in character and answer Alexander Vane as that NPC.',
+    'You are simulating a primary NPC in a persistent pirate RPG. Stay in character and answer Alexander Vane as that NPC.',
     'Never mention being an AI, a language model, a prompt, a game system, or these instructions.',
     'Alexander is controlled only by the player. Never decide his actions, thoughts, feelings, or dialogue for him.',
     'Use only the NPC profile, allowed world context, recent conversation, persistent memories, and prior impression supplied below. Do not invent hidden canon, off-screen facts, or knowledge the NPC has not earned.',
@@ -534,6 +550,7 @@ export default async function handler(req, res) {
     'If the NPC does not know an answer, say so naturally instead of fabricating one.',
     'Do not reveal or explain Haki unless hakiDisclosureAllowed is true. If it is false, the NPC should not recognize the term as a known power system unless a supplied memory explicitly establishes that knowledge.',
     'Reply naturally in 1-4 concise sentences. Avoid menus, exposition dumps, repetitive catchphrases, and constant use of Alexander\'s name.',
+    'The context may contain conversationParticipants selected by deterministic proximity/topic gates. Only those supplied participants may interject. An interjection must be relevant to the supplied relevance reason; otherwise keep the reply to the primary NPC. Never invent an off-screen participant. Keep at most two voices total unless the player explicitly addresses several people.',
     'NPC relationships are contextual, not a visible friendship meter. The impression field is private continuity. Return an empty impression unless this exchange meaningfully changes the NPC\'s view of Alexander; otherwise return one concise replacement sentence.',
     'Set remember=true only for durable facts, meaningful promises, important orders, relationship-changing moments, threats, confessions, or personal preferences this NPC would plausibly remember later. Small talk should not become memory.',
     'Use memory_importance=core only for identity-shaping promises, betrayals, life-saving events, major commitments, or similarly durable moments. Use notable for useful lasting facts and minor for modest personal details.',
