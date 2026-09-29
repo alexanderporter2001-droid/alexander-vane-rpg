@@ -31,6 +31,7 @@ export class SeaScene extends Phaser.Scene {
   private heading = -Math.PI / 2;
   private lastSaveAt = 0;
   private nearestPort: Port | null = null;
+  private breachNotified = false;
 
   constructor() { super('SeaScene'); }
 
@@ -91,6 +92,10 @@ export class SeaScene extends Phaser.Scene {
     const save = SaveManager.get();
     advanceWorldClock(save, dt, 5.5);
 
+    if (Math.abs(this.speed) > 25 && save.ship.supplies > 0) {
+      save.ship.supplies = Math.max(0, save.ship.supplies - dt * 0.004);
+    }
+
     this.updateShip(dt);
     this.updateNavigation();
     this.updateHud();
@@ -128,6 +133,12 @@ export class SeaScene extends Phaser.Scene {
   }
 
   private updateShip(dt: number): void {
+    const save = SaveManager.get();
+    if (save.world.flags.waywardGullDisabled || save.ship.hull <= 0) {
+      this.disableGull();
+      return;
+    }
+
     const mobileX = this.mobile?.move.x ?? 0;
     const mobileY = this.mobile?.move.y ?? 0;
 
@@ -161,14 +172,63 @@ export class SeaScene extends Phaser.Scene {
 
     const inReef = this.isInReef(this.ship.x, this.ship.y);
     if (inReef && Math.abs(this.speed) > 80) {
-      const save = SaveManager.get();
       save.ship.hull = Math.max(0, save.ship.hull - 8 * dt);
       this.speed *= 0.97;
       if (Math.random() < 0.025) this.cameras.main.shake(70, 0.003);
+      if (save.ship.hull <= 0) this.disableGull();
     }
   }
 
+  private disableGull(): void {
+    const save = SaveManager.get();
+    save.ship.hull = 0;
+    save.ship.speed = 0;
+    save.world.flags.waywardGullDisabled = true;
+    this.speed = 0;
+    this.ship.setVelocity(0, 0);
+    if (!this.breachNotified) {
+      this.breachNotified = true;
+      this.toast.show('Hull breach. The Gull is disabled; movement is impossible until the crew makes an emergency patch.', 4200);
+      SaveManager.save();
+    }
+  }
+
+  private emergencyPatch(): void {
+    const save = SaveManager.get();
+    const rope = save.inventory['Rope'] ?? 0;
+    if (rope < 1 || save.ship.supplies < 18) {
+      this.toast.show('Sera: We do not have enough rope and spare supplies for a seaworthy emergency patch.', 4200);
+      return;
+    }
+
+    save.inventory['Rope'] = rope - 1;
+    save.ship.supplies -= 18;
+    save.ship.hull = 18;
+    save.world.flags.waywardGullDisabled = false;
+    for (const crew of save.crew) crew.morale = Math.max(0, crew.morale - 0.06);
+    advanceWorldClock(save, 180 * 60, 1);
+
+    if (!save.journal.some((entry) => entry.id === 'gull-emergency-patch')) {
+      save.journal.push({
+        id: 'gull-emergency-patch',
+        title: 'Emergency hull patch',
+        body: 'The Wayward Gull suffered a hull breach at sea. The crew consumed rope and supplies to make a temporary repair. A proper shipwright is still needed.',
+        known: true,
+      });
+    }
+
+    this.breachNotified = false;
+    SaveManager.save();
+    this.toast.show('Three hours later, the emergency patch holds. The Gull can move again, but the hull is in bad shape.', 4500);
+  }
+
   private updateNavigation(): void {
+    const save = SaveManager.get();
+    if (save.world.flags.waywardGullDisabled) {
+      this.mobile?.setInteract('Patch hull');
+      return;
+    }
+
     let best: { port: Port; d: number } | null = null;
     for (const port of this.ports) {
       const d = Phaser.Math.Distance.Between(this.ship.x, this.ship.y, port.x, port.y);
@@ -190,6 +250,10 @@ export class SeaScene extends Phaser.Scene {
   }
 
   private tryDock(): void {
+    if (SaveManager.get().world.flags.waywardGullDisabled) {
+      this.emergencyPatch();
+      return;
+    }
     if (!this.nearestPort) return;
 
     const d = Phaser.Math.Distance.Between(
@@ -257,8 +321,10 @@ export class SeaScene extends Phaser.Scene {
     const save = SaveManager.get();
     this.hud.setText([
       `Wayward Gull · Hull ${Math.ceil(save.ship.hull)}/${save.ship.maxHull}`,
-      `Speed ${Math.round(Math.abs(this.speed))}`,
-      'W/S throttle · A/D steer · F dock',
+      `Supplies ${Math.floor(save.ship.supplies)} · Speed ${Math.round(Math.abs(this.speed))}`,
+      save.world.flags.waywardGullDisabled
+        ? 'DISABLED · F / INTERACT emergency patch'
+        : 'W/S throttle · A/D steer · F dock',
     ]);
 
     const gullrock = this.ports[1];
