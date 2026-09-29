@@ -131,6 +131,7 @@ export class PauseScene extends Phaser.Scene {
       `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp} · Stamina ${Math.ceil(save.player.stamina)}/${save.player.maxStamina}`,
       `Berries ${save.player.berries.toLocaleString()} · Bounty ${save.player.bounty.toLocaleString()}`,
       `Fruit familiarity ${Math.round(save.player.fruit.mastery * 100)}% · name unknown`,
+      `Combat experience ${Math.floor(save.player.progression.combatExperience)} · conditioning ${Math.round(save.player.progression.physicalConditioning * 100)}%`,
       '',
       'CREW',
       crew,
