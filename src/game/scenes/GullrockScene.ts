@@ -4,6 +4,7 @@ import { DialoguePanel, type DialogueChoice } from '../systems/DialoguePanel';
 import type { DialogueSpeakerId } from '../systems/DialogueIntent';
 import { resolveDialogueAI } from '../systems/DialogueAI';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
+import { EQUIPMENT, GULLROCK_GEAR_STOCK, isCompatible } from '../systems/Equipment';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
@@ -299,6 +300,36 @@ export class GullrockScene extends Phaser.Scene {
       run: () => this.noticeboard(),
     });
     this.interactions.register({
+      id: 'dock-work-a',
+      x: 585,
+      y: 735,
+      radius: 72,
+      label: 'Load cargo 1/3',
+      enabled: () => SaveManager.get().world.flags.gullrockDockJobActive === true
+        && Number(SaveManager.get().world.flags.gullrockDockJobProgress ?? 0) === 0,
+      run: () => this.workCargoPoint(0),
+    });
+    this.interactions.register({
+      id: 'dock-work-b',
+      x: 885,
+      y: 735,
+      radius: 72,
+      label: 'Load cargo 2/3',
+      enabled: () => SaveManager.get().world.flags.gullrockDockJobActive === true
+        && Number(SaveManager.get().world.flags.gullrockDockJobProgress ?? 0) === 1,
+      run: () => this.workCargoPoint(1),
+    });
+    this.interactions.register({
+      id: 'dock-work-c',
+      x: 725,
+      y: 825,
+      radius: 72,
+      label: 'Load cargo 3/3',
+      enabled: () => SaveManager.get().world.flags.gullrockDockJobActive === true
+        && Number(SaveManager.get().world.flags.gullrockDockJobProgress ?? 0) === 2,
+      run: () => this.workCargoPoint(2),
+    });
+    this.interactions.register({
       id: 'return-ship',
       x: 725,
       y: 870,
@@ -380,12 +411,200 @@ export class GullrockScene extends Phaser.Scene {
       },
     };
 
+    if (id === 'maris') {
+      this.traderShop();
+      return;
+    }
+
+    if (id === 'nico') {
+      this.dockWork();
+      return;
+    }
+
     const opening = openings[id];
     this.openDialogue(
       opening.speaker,
       opening.text,
       [{ label: 'End conversation', run: () => undefined }],
     );
+  }
+
+  private traderStock(itemId: string): number {
+    const save = SaveManager.get();
+    const key = `gullrockGearStock-${itemId}`;
+    const existing = save.world.flags[key];
+    if (typeof existing === 'number') return Math.max(0, Math.floor(existing));
+
+    const starting = itemId === 'padded-deck-guard' || itemId === 'weatherproof-coat' ? 2 : 1;
+    save.world.flags[key] = starting;
+    return starting;
+  }
+
+  private compatibleNames(itemId: string): string {
+    const save = SaveManager.get();
+    const item = EQUIPMENT[itemId];
+    if (!item) return 'nobody';
+
+    const names: string[] = [];
+    if (isCompatible(item, save.player.equipmentTags)) names.push('Alexander');
+    for (const member of save.crew) {
+      if (isCompatible(item, member.equipmentTags)) names.push(member.name.split(' ')[0] ?? member.name);
+    }
+    return names.length ? names.join(', ') : 'no current crew';
+  }
+
+  private traderShop(): void {
+    const save = SaveManager.get();
+    const choices: DialogueChoice[] = GULLROCK_GEAR_STOCK.map((itemId) => {
+      const item = EQUIPMENT[itemId];
+      const stock = this.traderStock(itemId);
+      const canAfford = save.player.berries >= item.price;
+      return {
+        label: stock <= 0
+          ? `${item.name} — SOLD OUT`
+          : canAfford
+            ? `${item.name} — ${item.price.toLocaleString()} berries · fits ${this.compatibleNames(itemId)}`
+            : `${item.name} — ${item.price.toLocaleString()} berries (not enough)`,
+        disabled: stock <= 0 || !canAfford,
+        run: () => this.buyEquipment(itemId),
+      };
+    });
+
+    choices.push({ label: 'Just talk', run: () => this.openDialogue(
+      'Maris — Coastal Trader',
+      'Maris folds her arms over the counter. “Fine. What did you actually want to ask?”',
+      [{ label: 'Back to stock', run: () => this.traderShop() }],
+    ) });
+    choices.push({ label: 'Leave', run: () => undefined });
+
+    this.openDialogue(
+      'Maris — Coastal Trader',
+      `“Gear costs what it costs. I do not sell people things they cannot use.”\n\nYou have ${save.player.berries.toLocaleString()} berries. Bought equipment goes into the ship's gear inventory until you assign it from the GEAR tab.`,
+      choices,
+    );
+  }
+
+  private buyEquipment(itemId: string): void {
+    const save = SaveManager.get();
+    const item = EQUIPMENT[itemId];
+    if (!item) return;
+
+    const stock = this.traderStock(itemId);
+    if (stock <= 0 || save.player.berries < item.price) return;
+
+    save.player.berries -= item.price;
+    save.equipmentInventory[itemId] = (save.equipmentInventory[itemId] ?? 0) + 1;
+    save.world.flags[`gullrockGearStock-${itemId}`] = stock - 1;
+    advanceWorldMinutes(save, 3);
+    SaveManager.save();
+
+    this.openDialogue(
+      'Maris — Coastal Trader',
+      `Maris wraps the ${item.name} for the Gull. “${item.description} Assign it to somebody who can actually use it.”\n\nRemaining berries: ${save.player.berries.toLocaleString()}.`,
+      [
+        { label: 'Back to gear stock', run: () => this.traderShop() },
+        { label: 'Done', run: () => undefined },
+      ],
+    );
+  }
+
+  private dockWork(): void {
+    const save = SaveManager.get();
+    const active = save.world.flags.gullrockDockJobActive === true;
+    const completedDay = Number(save.world.flags.gullrockDockShiftDay ?? 0);
+    const progress = Number(save.world.flags.gullrockDockJobProgress ?? 0);
+
+    if (active) {
+      this.openDialogue(
+        'Nico — Dockhand',
+        `“Still got that loading shift. You are ${progress}/3 stacks in. Follow the cargo markers on the main quay.”`,
+        [
+          { label: 'Talk about something else', run: () => this.openDialogue(
+            'Nico — Dockhand',
+            'Nico wipes his hands on his trousers. “All right. What is it?”',
+            [{ label: 'Back', run: () => this.dockWork() }],
+          ) },
+          { label: 'Leave', run: () => undefined },
+        ],
+      );
+      return;
+    }
+
+    if (completedDay === save.world.day) {
+      this.openDialogue(
+        'Nico — Dockhand',
+        '“You already did a paid loading shift today. I can probably find more work tomorrow, but the harbor master is not paying twice for the same hands.”',
+        [
+          { label: 'Talk', run: () => this.openDialogue(
+            'Nico — Dockhand',
+            'Nico leans against a bollard. “What do you want to know?”',
+            [{ label: 'Back', run: () => this.dockWork() }],
+          ) },
+          { label: 'Leave', run: () => undefined },
+        ],
+      );
+      return;
+    }
+
+    this.openDialogue(
+      'Nico — Dockhand',
+      '“If you want honest money, three cargo stacks need to reach the outgoing pier before the tide turns. Pay is 2,400 berries for the shift. Walk the quay, load all three, then you are done.”',
+      [
+        { label: 'Take loading shift — 2,400 berries on completion', run: () => this.acceptDockShift() },
+        { label: 'Just talk', run: () => this.openDialogue(
+          'Nico — Dockhand',
+          'Nico sets the rope coil aside. “Sure. What did you want?”',
+          [{ label: 'Back', run: () => this.dockWork() }],
+        ) },
+        { label: 'Leave', run: () => undefined },
+      ],
+    );
+  }
+
+  private acceptDockShift(): void {
+    const save = SaveManager.get();
+    save.world.flags.gullrockDockJobActive = true;
+    save.world.flags.gullrockDockJobProgress = 0;
+    advanceWorldMinutes(save, 2);
+    SaveManager.save();
+    this.dialogue.close();
+    this.toast.show('Dock shift started · load cargo stack 1/3 on the quay.', 3600);
+  }
+
+  private workCargoPoint(expectedProgress: number): void {
+    const save = SaveManager.get();
+    if (save.world.flags.gullrockDockJobActive !== true) return;
+
+    const progress = Number(save.world.flags.gullrockDockJobProgress ?? 0);
+    if (progress !== expectedProgress) return;
+
+    const next = progress + 1;
+    save.world.flags.gullrockDockJobProgress = next;
+    advanceWorldMinutes(save, 12);
+
+    if (next < 3) {
+      SaveManager.save();
+      this.toast.show(`Cargo loaded · ${next}/3. Find the next marked stack.`, 3000);
+      return;
+    }
+
+    const pay = 2_400;
+    save.player.berries += pay;
+    save.world.flags.gullrockDockJobActive = false;
+    save.world.flags.gullrockDockShiftDay = save.world.day;
+    save.world.flags.gullrockDockJobProgress = 0;
+
+    if (!save.journal.some((entry) => entry.id === 'gullrock-dock-work')) {
+      save.journal.push({
+        id: 'gullrock-dock-work',
+        title: 'Paid Work in Gullrock',
+        body: 'Nico can arrange one paid cargo-loading shift per day at Gullrock. Completing the three quay loading points pays 2,400 berries.',
+        known: true,
+      });
+    }
+
+    SaveManager.save();
+    this.toast.show(`Shift complete · +${pay.toLocaleString()} berries.`, 4200);
   }
 
   private crewConversation(id: 'sera' | 'rowan'): void {
