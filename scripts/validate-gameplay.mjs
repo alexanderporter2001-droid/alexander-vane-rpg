@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const mobile = fs.readFileSync(new URL('../src/game/systems/MobileControls.ts', import.meta.url), 'utf8');
 const dialogue = fs.readFileSync(new URL('../src/game/systems/DialoguePanel.ts', import.meta.url), 'utf8');
+const toast = fs.readFileSync(new URL('../src/game/systems/Toast.ts', import.meta.url), 'utf8');
 const style = fs.readFileSync(new URL('../src/style.css', import.meta.url), 'utf8');
 const harrow = fs.readFileSync(new URL('../src/game/scenes/HarrowScene.ts', import.meta.url), 'utf8');
 const gullrock = fs.readFileSync(new URL('../src/game/scenes/GullrockScene.ts', import.meta.url), 'utf8');
@@ -17,6 +18,12 @@ const checks = [
   ['dialogue uses native DOM overlay', dialogue.includes("document.createElement('section')") && dialogue.includes('dialogue-overlay')],
   ['dialogue body can scroll', style.includes('.dialogue-body') && style.includes('overflow-y:auto')],
   ['dialogue respects safe areas', style.includes('env(safe-area-inset-bottom)')],
+  ['status toast is native DOM', toast.includes("document.createElement('div')") && style.includes('.game-toast')],
+  ['touch attack supports hold repeat', mobile.includes('390') && mobile.includes('setInterval(action, repeatMs)')],
+  ['context action replaces order utility', mobile.includes('!this.interactLabel')],
+  ['mobile attack aim assist exists', harrow.includes('mobileAttackFacing')],
+  ['dash remembers last facing', harrow.includes('this.lastFacing.clone()')],
+  ['downed enemies rotate visibly', harrow.includes("setAngle(90)") && harrow.includes("'DOWN'")],
   ['Harrow uses mobile controls', harrow.includes('new MobileControls')],
   ['Sea uses mobile controls', sea.includes('new MobileControls')],
   ['Gullrock uses mobile controls', gullrock.includes('new MobileControls')],
