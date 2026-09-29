@@ -295,6 +295,7 @@ export class PauseScene extends Phaser.Scene {
   }
 
   private resumeGame(): void {
+    document.body.classList.remove('journal-open');
     this.scene.stop();
     this.scene.resume(this.source);
   }
