@@ -554,11 +554,12 @@ export class HarrowScene extends Phaser.Scene {
 
   private pull(): void {
     const save = SaveManager.get();
-    if (this.dead || this.time.now < this.pullReadyAt || save.player.stamina < 12) return;
+    const fruit = fruitStats(save);
+    if (this.dead || this.time.now < this.pullReadyAt || save.player.stamina < fruit.staminaCost) return;
 
     this.pullReadyAt = this.time.now + 560;
-    save.player.stamina -= 12;
-    const range = save.player.fruit.range;
+    save.player.stamina -= fruit.staminaCost;
+    const range = fruit.range;
     let affected = 0;
 
     const pulse = this.add.circle(this.player.x, this.player.y, 24, 0x79bfd3, 0)
