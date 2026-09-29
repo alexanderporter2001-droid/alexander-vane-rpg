@@ -1,7 +1,27 @@
 export type SceneId = 'opening' | 'harrow' | 'sea' | 'gullrock';
-export type CaptainOrder = 'regroup' | 'aggressive' | 'defensive' | 'protect-sera' | 'retreat' | 'repel-boarders' | 'board-enemy' | 'keep-distance' | 'close-distance';
-export type EncounterDisposition = 'friendly' | 'neutral' | 'wary' | 'hostile';
+export type CaptainOrder =
+  | 'regroup'
+  | 'aggressive'
+  | 'defensive'
+  | 'protect-sera'
+  | 'retreat'
+  | 'repel-boarders'
+  | 'board-enemy'
+  | 'keep-distance'
+  | 'close-distance';
+export type EncounterDisposition = 'friendly' | 'neutral' | 'wary' | 'hostile' | 'afraid';
 export type EncounterRank = 'civilian' | 'rookie' | 'veteran' | 'officer' | 'elite' | 'admiral';
+export type EncounterIntent =
+  | 'pass-by'
+  | 'trade'
+  | 'warn'
+  | 'inspect'
+  | 'pursue'
+  | 'negotiate'
+  | 'attack'
+  | 'flee'
+  | 'board';
+export type EncounterSource = 'ambient' | 'escalation' | 'authored';
 export type EquipmentSlot = 'weapon' | 'armor' | 'tool' | 'accessory';
 
 export interface Vec2 { x: number; y: number }
@@ -61,6 +81,7 @@ export interface CrewState {
     techniques: string[];
   };
   recruitedDay: number;
+  visualArchetype?: string;
 }
 
 export interface WorldIslandState {
@@ -78,6 +99,13 @@ export interface WorldIslandState {
   activeSituations: string[];
   resolvedSituations: string[];
   lastSimulatedDay: number;
+  region?: 'east-blue' | 'grand-line' | 'calm-belt' | 'new-world' | 'unknown';
+  geography?: string[];
+  settlements?: string[];
+  resources?: string[];
+  opportunities?: string[];
+  notableTraits?: string[];
+  governmentImportance?: number;
 }
 
 export interface WorldEncounterState {
@@ -90,16 +118,24 @@ export interface WorldEncounterState {
   persistentGroupId: string | null;
   createdDay: number;
   resolved: boolean;
+  archetype?: string;
+  intent?: EncounterIntent;
+  source?: EncounterSource;
+  recognizedAlexander?: boolean;
+  strength?: number;
+  canonCharacterId?: string | null;
 }
 
 export interface KnownGroupState {
   id: string;
   name: string;
-  kind: 'marine' | 'pirate' | 'bounty-hunter' | 'civilian';
+  kind: 'marine' | 'pirate' | 'bounty-hunter' | 'criminal' | 'civilian';
   relationship: number;
   strength: number;
   alive: boolean;
   notes: string[];
+  lastSeenDay?: number;
+  locationId?: string;
 }
 
 export interface RecruitCandidateState {
@@ -113,6 +149,11 @@ export interface RecruitCandidateState {
   reasonToJoin: string;
   equipmentTags: string[];
   capabilities: string[];
+  personality?: string;
+  goals?: string[];
+  fightingStyle?: string;
+  visualArchetype?: string;
+  specialty?: number;
 }
 
 export interface ShipState {

@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../state/SaveManager';
+import type { WorldEncounterState } from '../state/types';
 import { DialoguePanel } from '../systems/DialoguePanel';
 import { resolveDialogueAI } from '../systems/DialogueAI';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
 import { equippedEffects } from '../systems/Equipment';
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { Toast } from '../systems/Toast';
-import { advanceWorldClock, formatWorldTime } from '../systems/WorldClock';
+import { advanceWorldClock } from '../systems/WorldClock';
+import { createEncounter, ensureKnownGroup } from '../systems/LivingWorld';
 
 interface Port {
   id: 'harrow' | 'gullrock';
@@ -74,9 +76,17 @@ export class SeaScene extends Phaser.Scene {
 
   private deck?: Phaser.GameObjects.Container;
   private deckPlayer?: Phaser.GameObjects.Image;
-  private deckSera?: Phaser.GameObjects.Image;
-  private deckRowan?: Phaser.GameObjects.Image;
+  private deckCrew = new Map<string, {
+    sprite: Phaser.GameObjects.Image;
+    label: Phaser.GameObjects.Text;
+    x: number;
+    y: number;
+  }>();
   private deckPlayerLocal = new Phaser.Math.Vector2(0, 62);
+  private encounterTravel = 0;
+  private activeEncounter: WorldEncounterState | null = null;
+  private encounterShip?: Phaser.GameObjects.Image;
+  private encounterAttackReadyAt = 0;
 
   constructor() { super('SeaScene'); }
 
@@ -178,6 +188,7 @@ export class SeaScene extends Phaser.Scene {
 
     this.applyShipVelocity(dt);
     this.syncDeckToShip();
+    this.updateSeaEncounter(dt);
     this.updateNavigation();
     this.updateHud();
 
@@ -437,15 +448,12 @@ export class SeaScene extends Phaser.Scene {
     g.lineStyle(5, 0xb58b56, 0.92).strokeRoundedRect(-92, -148, 184, 296, 62);
     g.lineStyle(2, 0x3e2b1d, 0.62);
     for (let y = -110; y <= 110; y += 28) g.lineBetween(-78, y, 78, y);
-
     g.fillStyle(0x4f351f, 1).fillRoundedRect(-64, 56, 128, 62, 10);
     g.lineStyle(3, 0x271a11, 0.8).strokeRoundedRect(-64, 56, 128, 62, 10);
-
     g.fillStyle(0x3a291b, 1).fillRect(-5, -126, 10, 170);
     g.fillStyle(0xc6b289, 0.92).fillTriangle(8, -116, 8, -44, 70, -65);
     g.fillStyle(0x172735, 1).fillCircle(0, -103, 18);
     g.lineStyle(4, 0xb98a4c, 1).strokeCircle(0, -103, 18);
-
     g.fillStyle(0x51371f, 1).fillRoundedRect(-78, 124, 156, 18, 8);
     g.lineStyle(3, 0x2b1d13, 0.7).strokeRoundedRect(-78, 124, 156, 18, 8);
 
@@ -461,41 +469,49 @@ export class SeaScene extends Phaser.Scene {
     this.deckPlayer = this.add.image(this.deckPlayerLocal.x, this.deckPlayerLocal.y, 'alexander')
       .setScale(0.58)
       .setDepth(8);
-    this.deckSera = this.add.image(0, -80, 'sera').setScale(0.54).setDepth(7);
-    this.deckRowan = this.add.image(48, 22, 'rowan').setScale(0.56).setDepth(7);
-
-    const seraLabel = this.add.text(0, -121, 'SERA · HELM', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '9px',
-      fontStyle: 'bold',
-      color: '#d6edf6',
-      backgroundColor: '#071116bb',
-      padding: { x: 4, y: 2 },
-    }).setOrigin(0.5);
-
-    const rowanLabel = this.add.text(48, -20, 'ROWAN', {
-      fontFamily: 'system-ui, sans-serif',
-      fontSize: '9px',
-      fontStyle: 'bold',
-      color: '#f0d9cb',
-      backgroundColor: '#071116bb',
-      padding: { x: 4, y: 2 },
-    }).setOrigin(0.5);
-
-    deck.add([g, title, this.deckSera, this.deckRowan, this.deckPlayer, seraLabel, rowanLabel]);
-    this.deck = deck;
+    deck.add([g, title, this.deckPlayer]);
+    this.deckCrew.clear();
 
     const save = SaveManager.get();
-    const sera = save.crew.find((member) => member.id === 'sera');
-    const rowan = save.crew.find((member) => member.id === 'rowan');
-    if (sera && sera.hp <= 0) {
-      this.deckSera.setTint(0x555b5f).setAlpha(0.7).setAngle(90);
-      seraLabel.setText('SERA · DOWN').setColor('#ffd3ca');
+    let slot = 0;
+    for (const member of save.crew) {
+      const atHelm = member.capabilities.includes('helm') && member.id === 'sera';
+      const column = slot % 3;
+      const row = Math.floor(slot / 3);
+      const x = atHelm ? 0 : -52 + column * 52;
+      const y = atHelm ? -80 : -20 + row * 48;
+      if (!atHelm) slot += 1;
+
+      const sprite = this.add.image(x, y, this.crewTexture(member.id, member.visualArchetype, member.role))
+        .setScale(member.id === 'rowan' ? 0.56 : 0.52)
+        .setDepth(7);
+      const label = this.add.text(x, y - 41, atHelm ? member.name.split(' ')[0] + ' · HELM' : member.name.split(' ')[0] ?? member.name, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '9px',
+        fontStyle: 'bold',
+        color: member.capabilities.includes('navigation') ? '#d6edf6' : '#f0d9cb',
+        backgroundColor: '#071116bb',
+        padding: { x: 4, y: 2 },
+      }).setOrigin(0.5);
+
+      if (member.hp <= 0) {
+        sprite.setTint(0x555b5f).setAlpha(0.7).setAngle(90);
+        label.setText(member.name.split(' ')[0] + ' · DOWN').setColor('#ffd3ca');
+      }
+
+      this.deckCrew.set(member.id, { sprite, label, x, y });
+      deck.add([sprite, label]);
     }
-    if (rowan && rowan.hp <= 0) {
-      this.deckRowan.setTint(0x555b5f).setAlpha(0.7).setAngle(90);
-      rowanLabel.setText('ROWAN · DOWN').setColor('#ffd3ca');
-    }
+
+    this.deck = deck;
+  }
+
+  private crewTexture(id: string, visualArchetype: string | undefined, role: string): string {
+    if (id === 'sera') return 'sera';
+    if (id === 'rowan') return 'rowan';
+    if (visualArchetype === 'crew-medic') return 'crew-medic';
+    if (visualArchetype === 'crew-fighter' || role.toLowerCase().includes('fighter')) return 'rowan';
+    return 'crew-specialist';
   }
 
   private syncDeckToShip(): void {
@@ -585,9 +601,12 @@ export class SeaScene extends Phaser.Scene {
     const canDock = Boolean(best && best.d <= 70 && Math.abs(this.speed) <= 28);
     const talkTarget = this.deckTalkTarget();
     if (talkTarget) {
-      this.mobile?.setInteract(`Talk ${talkTarget === 'sera' ? 'Sera' : 'Rowan'}`);
+      const name = save.crew.find((member) => member.id === talkTarget)?.name.split(' ')[0] ?? 'Crew';
+      this.mobile?.setInteract('Talk ' + name);
+    } else if (this.activeEncounter && !this.activeEncounter.resolved && this.encounterDistance() <= 280) {
+      this.mobile?.setInteract('Hail ship');
     } else {
-      this.mobile?.setInteract(canDock ? `Dock ${best?.port.name ?? ''}` : null);
+      this.mobile?.setInteract(canDock ? 'Dock ' + (best?.port.name ?? '') : null);
     }
   }
 
@@ -598,57 +617,58 @@ export class SeaScene extends Phaser.Scene {
       this.openCrewConversation(target);
       return;
     }
+    if (this.activeEncounter && !this.activeEncounter.resolved && this.encounterDistance() <= 280) {
+      this.openEncounterInteraction();
+      return;
+    }
     this.tryDock();
   }
 
-  private deckTalkTarget(): 'sera' | 'rowan' | null {
+  private deckTalkTarget(): string | null {
     if (this.navigationMode !== 'sera' || !this.deck?.visible) return null;
 
     const save = SaveManager.get();
-    const sera = save.crew.find((member) => member.id === 'sera');
-    const rowan = save.crew.find((member) => member.id === 'rowan');
-
-    const seraDistance = Phaser.Math.Distance.Between(
-      this.deckPlayerLocal.x,
-      this.deckPlayerLocal.y,
-      0,
-      -80,
-    );
-    const rowanDistance = Phaser.Math.Distance.Between(
-      this.deckPlayerLocal.x,
-      this.deckPlayerLocal.y,
-      48,
-      22,
-    );
-
-    const candidates: Array<{ id: 'sera' | 'rowan'; distance: number }> = [];
-    if (sera && sera.hp > 0 && seraDistance <= 72) candidates.push({ id: 'sera', distance: seraDistance });
-    if (rowan && rowan.hp > 0 && rowanDistance <= 72) candidates.push({ id: 'rowan', distance: rowanDistance });
-    candidates.sort((a, b) => a.distance - b.distance);
+    const candidates = [...this.deckCrew.entries()]
+      .filter(([id]) => (save.crew.find((member) => member.id === id)?.hp ?? 0) > 0)
+      .map(([id, view]) => ({
+        id,
+        distance: Phaser.Math.Distance.Between(this.deckPlayerLocal.x, this.deckPlayerLocal.y, view.x, view.y),
+      }))
+      .filter((entry) => entry.distance <= 72)
+      .sort((a, b) => a.distance - b.distance);
     return candidates[0]?.id ?? null;
   }
 
-  private openCrewConversation(id: 'sera' | 'rowan'): void {
+  private nearbyDeckCrewIds(primaryId: string): string[] {
+    return [...this.deckCrew.entries()]
+      .filter(([id]) => id !== primaryId)
+      .filter(([, view]) => Phaser.Math.Distance.Between(this.deckPlayerLocal.x, this.deckPlayerLocal.y, view.x, view.y) <= 150)
+      .map(([id]) => id);
+  }
+
+  private openCrewConversation(id: string): void {
     const save = SaveManager.get();
     const member = save.crew.find((candidate) => candidate.id === id);
     if (!member || member.hp <= 0) return;
 
     this.mobile?.setVisible(false);
-    const speaker = id === 'sera' ? 'Sera Quill' : 'Rowan Vale';
+    const speaker = member.name;
     const opening = id === 'sera'
       ? 'Sera keeps one hand near the helm and glances over. “I can listen. The course is steady.”'
-      : 'Rowan leans against the rail. “What is it?”';
+      : id === 'rowan'
+        ? 'Rowan leans against the rail. “What is it?”'
+        : member.name + ' looks over from the deck. “What do you need?”';
 
     this.dialogue.show({
       speaker,
       text: opening,
       choices: [{ label: 'End conversation', run: () => undefined }],
       freeform: {
-        placeholder: `Say anything to ${speaker}...`,
+        placeholder: 'Say anything to ' + speaker + '...',
         onSubmit: async (message, history) => {
           const current = SaveManager.get();
-          current.world.flags[`talkedTo-${id}`] = true;
-          const result = await resolveDialogueAI(id, message, current, history);
+          current.world.flags['talkedTo-' + id] = true;
+          const result = await resolveDialogueAI(id, message, current, history, this.nearbyDeckCrewIds(id));
 
           if (id === 'sera' && result.action.type === 'set_course') {
             const port = this.ports.find((candidate) => candidate.id === result.action.target);
@@ -776,6 +796,163 @@ export class SeaScene extends Phaser.Scene {
     this.scene.start('HarrowScene');
   }
 
+  private encounterDistance(): number {
+    if (!this.encounterShip) return Number.POSITIVE_INFINITY;
+    return Phaser.Math.Distance.Between(this.ship.x, this.ship.y, this.encounterShip.x, this.encounterShip.y);
+  }
+
+  private updateSeaEncounter(dt: number): void {
+    if (this.docking) return;
+    this.encounterTravel += Math.abs(this.speed) * dt;
+
+    if (!this.activeEncounter && this.encounterTravel >= 1800) {
+      this.encounterTravel = 0;
+      const save = SaveManager.get();
+      const encounter = createEncounter(save, 'east-blue-open-sea', true, save.world.encounters.length);
+      encounter.persistentGroupId = 'group-' + encounter.id;
+      ensureKnownGroup(save, {
+        id: encounter.persistentGroupId,
+        name: encounter.kind === 'pirate'
+          ? 'Unidentified pirate crew'
+          : encounter.kind === 'marine'
+            ? 'East Blue Marine patrol'
+            : encounter.kind === 'merchant'
+              ? 'Passing merchant crew'
+              : 'Passing ' + encounter.kind.replace('-', ' '),
+        kind: encounter.kind === 'traveler' || encounter.kind === 'merchant' ? 'civilian' : encounter.kind,
+        relationship: encounter.disposition === 'friendly' ? 0.25 : encounter.disposition === 'hostile' ? -0.35 : 0,
+        strength: encounter.strength ?? 0.4,
+        alive: true,
+        notes: [],
+        lastSeenDay: save.world.day,
+        locationId: save.world.locationId,
+      });
+      this.activeEncounter = encounter;
+      this.encounterShip = this.add.image(this.ship.x + 520, this.ship.y - 210, 'wayward-gull')
+        .setScale(0.56)
+        .setDepth(42)
+        .setTint(
+          encounter.kind === 'marine' ? 0xd7e8ef
+            : encounter.kind === 'pirate' ? 0x9b6554
+              : encounter.kind === 'merchant' ? 0xb89a59
+                : 0x8b8f91,
+        );
+      const posture = encounter.disposition === 'hostile'
+        ? 'turns toward the Gull'
+        : encounter.disposition === 'friendly'
+          ? 'signals without closing aggressively'
+          : 'holds its own course';
+      this.toast.show(
+        'Sea encounter: ' + encounter.kind.replace('-', ' ') + ' · ' + encounter.rank + '. The other ship ' + posture + '.',
+        4200,
+      );
+      SaveManager.save();
+    }
+
+    const encounter = this.activeEncounter;
+    const other = this.encounterShip;
+    if (!encounter || !other || encounter.resolved) return;
+
+    const distance = this.encounterDistance();
+    const hostile = encounter.disposition === 'hostile' || encounter.intent === 'attack' || encounter.intent === 'pursue' || encounter.intent === 'board';
+    if (hostile) {
+      const toward = new Phaser.Math.Vector2(this.ship.x - other.x, this.ship.y - other.y).normalize();
+      const chaseSpeed = 88 + (encounter.strength ?? 0.4) * 62;
+      other.x += toward.x * chaseSpeed * dt;
+      other.y += toward.y * chaseSpeed * dt;
+
+      if (distance <= 240 && this.time.now >= this.encounterAttackReadyAt) {
+        this.encounterAttackReadyAt = this.time.now + 2300;
+        const damage = 2 + Math.round((encounter.strength ?? 0.4) * 5);
+        const save = SaveManager.get();
+        save.ship.hull = Math.max(0, save.ship.hull - damage);
+        this.cameras.main.shake(80, 0.0028);
+        this.toast.show('Incoming ship fire hits the Gull · hull -' + damage + '. Break range or change the situation.', 2600);
+        if (save.ship.hull <= 0) this.disableGull();
+      }
+
+      if (distance > 1050) this.finishSeaEncounter(0, 'You break contact and the other ship gives up the chase.');
+    } else {
+      other.y -= 54 * dt;
+      if (distance > 980) this.finishSeaEncounter(0, 'The other ship passes without forcing an encounter.');
+    }
+  }
+
+  private openEncounterInteraction(): void {
+    const encounter = this.activeEncounter;
+    if (!encounter || encounter.resolved) return;
+
+    const hostile = encounter.disposition === 'hostile' || encounter.intent === 'attack' || encounter.intent === 'pursue' || encounter.intent === 'board';
+    if (hostile) {
+      this.toast.show('They are not answering a peaceful hail. Their maneuvering is the answer.', 2600);
+      return;
+    }
+
+    this.mobile?.setVisible(false);
+    if (encounter.kind === 'merchant') {
+      const save = SaveManager.get();
+      const canBuy = save.player.berries >= 450 && save.ship.supplies <= 92;
+      this.dialogue.show({
+        speaker: 'Passing Merchant',
+        text: 'The merchant vessel keeps enough distance to run if needed. “Water and preserved food. Four hundred fifty berries for a small sea pack.”',
+        choices: [
+          {
+            label: canBuy ? 'Trade — 450 berries for 8 supplies' : 'Trade — unavailable',
+            disabled: !canBuy,
+            run: () => {
+              const current = SaveManager.get();
+              if (current.player.berries >= 450 && current.ship.supplies <= 92) {
+                current.player.berries -= 450;
+                current.ship.supplies = Math.min(100, current.ship.supplies + 8);
+                this.toast.show('Trade complete · -450 berries · +8 supplies.', 3000);
+                this.finishSeaEncounter(0.08, 'The merchant crew parts on good terms.');
+              }
+            },
+          },
+          { label: 'Decline and part ways', run: () => this.finishSeaEncounter(0, 'The merchant ship continues on its route.') },
+        ],
+        onClose: () => this.mobile?.setVisible(true),
+      });
+      return;
+    }
+
+    const speaker = encounter.kind === 'pirate' ? 'Passing Pirate Captain' : encounter.kind === 'marine' ? 'Marine Patrol' : 'Passing Crew';
+    const text = encounter.kind === 'pirate'
+      ? 'The pirate ship answers the hail but keeps its weapons ready. They are watching the Gull as carefully as you are watching them.'
+      : encounter.kind === 'marine'
+        ? 'The patrol answers by signal and asks the Gull to identify its destination. They have not opened fire.'
+        : 'The other vessel answers briefly and waits to see what you want.';
+    this.dialogue.show({
+      speaker,
+      text,
+      choices: [
+        { label: 'Exchange basic information and move on', run: () => this.finishSeaEncounter(0.04, 'Both ships continue without violence.') },
+        { label: 'Keep your distance and end contact', run: () => this.finishSeaEncounter(0, 'The contact ends without a fight.') },
+      ],
+      onClose: () => this.mobile?.setVisible(true),
+    });
+  }
+
+  private finishSeaEncounter(relationshipDelta: number, message: string): void {
+    const encounter = this.activeEncounter;
+    if (!encounter) return;
+    encounter.resolved = true;
+    const save = SaveManager.get();
+    if (encounter.persistentGroupId) {
+      const group = save.world.knownGroups[encounter.persistentGroupId];
+      if (group) {
+        group.relationship = Phaser.Math.Clamp(group.relationship + relationshipDelta, -1, 1);
+        group.lastSeenDay = save.world.day;
+        group.locationId = save.world.locationId;
+      }
+    }
+    this.encounterShip?.destroy();
+    this.encounterShip = undefined;
+    this.activeEncounter = null;
+    SaveManager.save();
+    this.toast.show(message, 2600);
+  }
+
   private createHud(): void {
     this.hud = this.add.text(14, 14, '', {
       fontFamily: 'system-ui, sans-serif',
@@ -802,15 +979,9 @@ export class SeaScene extends Phaser.Scene {
     const save = SaveManager.get();
     const delegated = this.navigationMode === 'sera';
     this.hud.setText([
-      `Wayward Gull · Hull ${Math.ceil(save.ship.hull)}/${save.ship.maxHull}`,
-      `Supplies ${Math.floor(save.ship.supplies)} · Speed ${Math.round(Math.abs(this.speed))}`,
-      `Berries ${save.player.berries.toLocaleString()}`,
-      delegated
-        ? `Sera at helm · course: ${this.navTarget.name}`
-        : 'Alexander at helm · R / ORDER gives helm to Sera',
-      delegated
-        ? 'Walk the deck freely · R / ORDER takes the helm'
-        : 'W/S throttle · A/D steer · F dock',
+      'HP ' + Math.ceil(save.player.hp) + '/' + save.player.maxHp,
+      delegated ? 'Sera at helm' : 'Alexander at helm',
+      'Speed ' + Math.round(Math.abs(this.speed)),
     ]);
 
     const dist = Math.round(Phaser.Math.Distance.Between(
@@ -826,9 +997,8 @@ export class SeaScene extends Phaser.Scene {
       this.navTarget.y,
     ));
     this.nav.setText([
-      formatWorldTime(save),
-      `${this.navTarget.name}: ${dist} m ${bearing}`,
-      `World position: ${Math.round(this.ship.x)}, ${Math.round(this.ship.y)}`,
+      this.navTarget.name,
+      dist + ' m ' + bearing,
     ]);
 
     this.crewHud.update(save.crew.map((member) => ({
@@ -854,6 +1024,11 @@ export class SeaScene extends Phaser.Scene {
     save.ship.speed = this.speed;
     save.world.flags.sailingDelegated = this.navigationMode === 'sera';
     SaveManager.save();
+    this.hud.setVisible(false);
+    this.nav.setVisible(false);
+    this.crewHud.setVisible(false);
+    this.mobile?.setVisible(false);
+    this.events.once('resume', () => { this.hud.setVisible(true); this.nav.setVisible(true); this.mobile?.setVisible(true); });
     this.scene.launch('PauseScene', { source: this.scene.key });
     this.scene.pause();
   }

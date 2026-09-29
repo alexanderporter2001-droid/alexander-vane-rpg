@@ -8,14 +8,20 @@ import { EQUIPMENT, GULLROCK_GEAR_STOCK, isCompatible } from '../systems/Equipme
 import { MobileControls, shouldUseMobileControls } from '../systems/MobileControls';
 import { InteractionSystem } from '../systems/InteractionSystem';
 import { Toast } from '../systems/Toast';
-import { advanceWorldClock, advanceWorldMinutes, formatWorldTime } from '../systems/WorldClock';
+import { advanceWorldClock, advanceWorldMinutes } from '../systems/WorldClock';
+import { recruit } from '../systems/Recruitment';
+
+interface PortCrewUnit {
+  id: string;
+  sprite: Phaser.Physics.Arcade.Sprite;
+  label: Phaser.GameObjects.Text;
+}
 
 export class GullrockScene extends Phaser.Scene {
   private readonly worldW = 1500;
   private readonly worldH = 980;
   private player!: Phaser.Physics.Arcade.Sprite;
-  private crew: Phaser.Physics.Arcade.Sprite[] = [];
-  private crewLabels: Phaser.GameObjects.Text[] = [];
+  private crew: PortCrewUnit[] = [];
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private mobile?: MobileControls;
   private interactions!: InteractionSystem;
@@ -46,13 +52,21 @@ export class GullrockScene extends Phaser.Scene {
     this.player.setBodySize(34, 30).setOffset(19, 70);
     this.lastValid.set(savedSpawn.x, savedSpawn.y);
 
-    const sera = this.physics.add.sprite(665, 825, 'sera').setDepth(48).setCollideWorldBounds(true);
-    const rowan = this.physics.add.sprite(785, 825, 'rowan').setDepth(49).setCollideWorldBounds(true);
-    this.crew = [sera, rowan];
-    this.crewLabels = [
-      this.makeCrewLabel(sera, 'SERA QUILL', '#d6edf6'),
-      this.makeCrewLabel(rowan, 'ROWAN VALE', '#f0d9cb'),
-    ];
+    this.crew = save.crew.map((member, index) => {
+      const column = index % 4;
+      const row = Math.floor(index / 4);
+      const x = 640 + column * 55;
+      const y = 825 - row * 52;
+      const texture = this.crewTexture(member.id, member.visualArchetype, member.role);
+      const sprite = this.physics.add.sprite(x, y, texture).setDepth(48 + Math.min(index, 8)).setCollideWorldBounds(true);
+      const color = member.capabilities.includes('navigation') ? '#d6edf6' : '#f0d9cb';
+      const label = this.makeCrewLabel(sprite, member.name.toUpperCase(), color);
+      if (member.hp <= 0) {
+        sprite.setTint(0x555b5f).setAlpha(0.72).setAngle(90);
+        label.setText(member.name.toUpperCase() + ' · DOWN').setColor('#ffd3ca');
+      }
+      return { id: member.id, sprite, label };
+    });
 
     this.dialogue = new DialoguePanel(this);
     this.createInput();
@@ -87,7 +101,7 @@ export class GullrockScene extends Phaser.Scene {
   update(_time: number, deltaMs: number): void {
     if (this.dialogue.isOpen()) {
       this.player.setVelocity(0, 0);
-      for (const member of this.crew) member.setVelocity(0, 0);
+      for (const member of this.crew) member.sprite.setVelocity(0, 0);
       this.mobile?.setInteract(null);
       this.updateHud();
       return;
@@ -163,10 +177,28 @@ export class GullrockScene extends Phaser.Scene {
   }
 
   private updateCrew(): void {
-    const [sera, rowan] = this.crew;
-    if (sera) this.follow(sera, this.player.x - 55, this.player.y + 40, 138);
-    if (rowan) this.follow(rowan, this.player.x + 58, this.player.y + 28, 150);
-    this.syncCrewLabels();
+    this.crew.forEach((unit, index) => {
+      const state = SaveManager.get().crew.find((member) => member.id === unit.id);
+      if (!state || state.hp <= 0) {
+        unit.sprite.setVelocity(0, 0);
+        return;
+      }
+
+      const column = index % 4;
+      const row = Math.floor(index / 4);
+      const offsetX = (column - 1.5) * 46;
+      const offsetY = 48 + row * 42;
+      this.follow(unit.sprite, this.player.x + offsetX, this.player.y + offsetY, 138 + Math.min(index, 4) * 3);
+      unit.label.setPosition(unit.sprite.x, unit.sprite.y - 58);
+    });
+  }
+
+  private crewTexture(id: string, visualArchetype: string | undefined, role: string): string {
+    if (id === 'sera') return 'sera';
+    if (id === 'rowan') return 'rowan';
+    if (visualArchetype === 'crew-medic') return 'crew-medic';
+    if (visualArchetype === 'crew-fighter' || role.toLowerCase().includes('fighter')) return 'rowan';
+    return 'crew-specialist';
   }
 
   private makeCrewLabel(sprite: Phaser.Physics.Arcade.Sprite, text: string, color: string): Phaser.GameObjects.Text {
@@ -178,13 +210,6 @@ export class GullrockScene extends Phaser.Scene {
       backgroundColor: '#071116c9',
       padding: { x: 5, y: 3 },
     }).setOrigin(0.5, 1).setDepth(84);
-  }
-
-  private syncCrewLabels(): void {
-    this.crewLabels.forEach((label, index) => {
-      const sprite = this.crew[index];
-      if (sprite) label.setPosition(sprite.x, sprite.y - 58);
-    });
   }
 
   private follow(sprite: Phaser.Physics.Arcade.Sprite, x: number, y: number, speed: number): void {
@@ -210,26 +235,26 @@ export class GullrockScene extends Phaser.Scene {
   }
 
   private registerInteractions(): void {
-    const sera = () => this.crew[0];
-    const rowan = () => this.crew[1];
+    for (const unit of this.crew) {
+      this.interactions.register({
+        id: 'crew-' + unit.id,
+        x: () => unit.sprite.x,
+        y: () => unit.sprite.y,
+        radius: 78,
+        label: 'Talk ' + (SaveManager.get().crew.find((member) => member.id === unit.id)?.name.split(' ')[0] ?? 'crew'),
+        enabled: () => (SaveManager.get().crew.find((member) => member.id === unit.id)?.hp ?? 0) > 0,
+        run: () => this.crewConversation(unit.id),
+      });
+    }
 
     this.interactions.register({
-      id: 'sera',
-      x: () => sera()?.x ?? -9999,
-      y: () => sera()?.y ?? -9999,
-      radius: 78,
-      label: 'Talk Sera',
-      enabled: () => (SaveManager.get().crew.find((member) => member.id === 'sera')?.hp ?? 0) > 0,
-      run: () => this.crewConversation('sera'),
-    });
-    this.interactions.register({
-      id: 'rowan',
-      x: () => rowan()?.x ?? -9999,
-      y: () => rowan()?.y ?? -9999,
-      radius: 78,
-      label: 'Talk Rowan',
-      enabled: () => (SaveManager.get().crew.find((member) => member.id === 'rowan')?.hp ?? 0) > 0,
-      run: () => this.crewConversation('rowan'),
+      id: 'mira-sorn',
+      x: 1225,
+      y: 330,
+      radius: 82,
+      label: 'Talk Mira',
+      enabled: () => SaveManager.get().world.recruitCandidates['mira-sorn']?.available === true,
+      run: () => this.miraSorn(),
     });
     this.interactions.register({
       id: 'harbor-master',
@@ -346,7 +371,7 @@ export class GullrockScene extends Phaser.Scene {
   private openDialogue(speaker: string, text: string, choices?: DialogueChoice[]): void {
     advanceWorldMinutes(SaveManager.get(), 1);
     this.player.setVelocity(0, 0);
-    for (const member of this.crew) member.setVelocity(0, 0);
+    for (const member of this.crew) member.sprite.setVelocity(0, 0);
     this.mobile?.setVisible(false);
 
     const intentSpeaker = this.intentSpeakerFor(speaker);
@@ -361,7 +386,7 @@ export class GullrockScene extends Phaser.Scene {
               const save = SaveManager.get();
               advanceWorldMinutes(save, 1);
               save.world.flags[`talkedTo-${intentSpeaker}`] = true;
-              const result = await resolveDialogueAI(intentSpeaker, message, save, history);
+              const result = await resolveDialogueAI(intentSpeaker, message, save, history, this.nearbyCrewIds(intentSpeaker));
               if (result.action.type === 'set_course' && intentSpeaker === 'sera') {
                 save.world.flags.shipDestination = result.action.target;
               }
@@ -392,7 +417,8 @@ export class GullrockScene extends Phaser.Scene {
     if (normalized.includes('nico')) return 'nico';
     if (normalized.includes('maris')) return 'maris';
     if (normalized.includes('perrin')) return 'perrin';
-    return null;
+    const crewMember = SaveManager.get().crew.find((member) => normalized.includes(member.name.toLowerCase()));
+    return crewMember?.id ?? null;
   }
 
   private localConversation(id: 'elias' | 'nico' | 'maris' | 'perrin'): void {
@@ -621,24 +647,108 @@ export class GullrockScene extends Phaser.Scene {
     this.toast.show(`Shift complete · +${pay.toLocaleString()} berries.`, 4200);
   }
 
-  private crewConversation(id: 'sera' | 'rowan'): void {
+  private nearbyCrewIds(primarySpeakerId: string): string[] {
+    return this.crew
+      .filter((unit) => unit.id !== primarySpeakerId)
+      .filter((unit) => Phaser.Math.Distance.Between(this.player.x, this.player.y, unit.sprite.x, unit.sprite.y) <= 230)
+      .map((unit) => unit.id);
+  }
+
+  private crewConversation(id: string): void {
     const save = SaveManager.get();
     const state = save.crew.find((member) => member.id === id);
     if (!state || state.hp <= 0) return;
 
-    if (id === 'sera') {
+    const opening = id === 'sera'
+      ? 'Sera turns toward you, keeping one eye on the harbor. “What do you need?”'
+      : id === 'rowan'
+        ? 'Rowan rests one chain hook against his shoulder and looks over. “Yeah?”'
+        : state.name + ' looks over from the crew formation. “What is it?”';
+
+    this.openDialogue(
+      state.name,
+      opening,
+      [{ label: 'End conversation', run: () => undefined }],
+    );
+  }
+
+  private miraSorn(): void {
+    const save = SaveManager.get();
+    const candidate = save.world.recruitCandidates['mira-sorn'];
+    if (!candidate || !candidate.available) return;
+
+    const helped = save.world.flags.miraSornHelped === true;
+    const hasMedicine = (save.inventory['Basic medicine'] ?? 0) > 0;
+    const canJoin = candidate.trust >= candidate.requiredTrust;
+
+    const choices: DialogueChoice[] = [];
+    if (!helped) {
+      choices.push({
+        label: hasMedicine ? 'Offer one Basic medicine' : 'Offer medicine — none available',
+        disabled: !hasMedicine,
+        run: () => this.helpMira(),
+      });
+    }
+    if (canJoin) {
+      choices.push({ label: 'Invite Mira to join the Wayward Gull', run: () => this.inviteMira() });
+    }
+    choices.push({ label: 'Leave', run: () => undefined });
+
+    this.openDialogue(
+      'Mira Sorn — Field Medic',
+      helped
+        ? 'Mira closes the small medical case at her feet. “You helped when you had no reason to. I remember that. I am nearly done here.”'
+        : 'A field medic is sorting a thin supply case beside the upper market. “If you need a doctor, I am working. If you need a miracle, find somebody richer.”',
+      choices,
+    );
+  }
+
+  private helpMira(): void {
+    const save = SaveManager.get();
+    const candidate = save.world.recruitCandidates['mira-sorn'];
+    const medicine = save.inventory['Basic medicine'] ?? 0;
+    if (!candidate || !candidate.available || medicine < 1 || save.world.flags.miraSornHelped === true) return;
+
+    save.inventory['Basic medicine'] = medicine - 1;
+    candidate.trust = Math.min(1, candidate.trust + 0.5);
+    save.world.flags.miraSornHelped = true;
+    advanceWorldMinutes(save, 18);
+    if (!save.journal.some((entry) => entry.id === 'mira-sorn')) {
+      save.journal.push({
+        id: 'mira-sorn',
+        title: 'Mira Sorn',
+        body: 'A Gullrock field medic named Mira Sorn accepted a needed medicine from Alexander. She wants to leave the island once her immediate obligation is settled.',
+        known: true,
+      });
+    }
+    SaveManager.save();
+    this.openDialogue(
+      'Mira Sorn — Field Medic',
+      'Mira checks the seal before putting the medicine into her case. “That covers the patient I was short for. You just made my situation considerably simpler.”',
+      [
+        { label: 'Ask her to join the crew', run: () => this.inviteMira() },
+        { label: 'Leave it there', run: () => undefined },
+      ],
+    );
+  }
+
+  private inviteMira(): void {
+    const save = SaveManager.get();
+    const member = recruit(save, 'mira-sorn');
+    if (!member) {
       this.openDialogue(
-        'Sera Quill',
-        `Sera turns toward you, keeping one eye on the harbor. “What do you need?”`,
-        [{ label: 'End conversation', run: () => undefined }],
+        'Mira Sorn — Field Medic',
+        'Mira shakes her head. “Not yet. I do not join ships because somebody asked once.”',
+        [{ label: 'Leave', run: () => undefined }],
       );
       return;
     }
 
+    SaveManager.save();
     this.openDialogue(
-      'Rowan Vale',
-      'Rowan rests one chain hook against his shoulder and looks over. “Yeah?”',
-      [{ label: 'End conversation', run: () => undefined }],
+      'Mira Sorn — Field Medic',
+      'Mira studies Alexander for a moment, then lifts her medical case. “All right. I want a bunk, room for my kit, and the right to tell you when an injury is serious. If that works, I sail with you.”',
+      [{ label: 'Welcome aboard', run: () => this.scene.restart() }],
     );
   }
 
@@ -996,6 +1106,10 @@ export class GullrockScene extends Phaser.Scene {
 
   private pauseGame(): void {
     SaveManager.save();
+    this.hud.setVisible(false);
+    this.crewHud.setVisible(false);
+    this.mobile?.setVisible(false);
+    this.events.once('resume', () => { this.hud.setVisible(true); this.mobile?.setVisible(true); });
     this.scene.launch('PauseScene', { source: this.scene.key });
     this.scene.pause();
   }
@@ -1042,15 +1156,8 @@ export class GullrockScene extends Phaser.Scene {
 
   private updateHud(): void {
     const save = SaveManager.get();
-    this.hud.setText([
-      'Gullrock Port',
-      formatWorldTime(save),
-      `Berries ${save.player.berries.toLocaleString()}`,
-      `Gull hull ${Math.ceil(save.ship.hull)}/${save.ship.maxHull} · Supplies ${Math.floor(save.ship.supplies)}`,
-      this.mobile
-        ? 'Use INTERACT near people and objects'
-        : 'F near people and objects',
-    ]);
+    this.hud.setText([`Gullrock Port`, `HP ${Math.ceil(save.player.hp)}/${save.player.maxHp}`]);
+    this.crewHud.setVisible(false);
     this.crewHud.update(save.crew.map((member) => ({
       id: member.id,
       name: member.name,
@@ -1195,6 +1302,8 @@ export class GullrockScene extends Phaser.Scene {
     npc(770, 600, 'npc-dockhand', 'Nico — Dockhand', '#c9d8dc');
     npc(1085, 355, 'npc-sailor', 'Maris — Coastal Trader', '#c9d8dc');
     npc(520, 365, 'npc-dockhand', 'Perrin — Porter', '#c9d8dc');
+    const mira = SaveManager.get().world.recruitCandidates['mira-sorn'];
+    if (mira?.available) npc(1225, 330, 'crew-medic', 'Mira Sorn — Field Medic', '#e5e8df');
 
     g.fillStyle(0x503520, 1).fillRoundedRect(755, 340, 60, 70, 5);
     g.fillStyle(0xe1d4b3, 1).fillRect(765, 350, 40, 20);

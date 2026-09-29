@@ -441,4 +441,5 @@ button,input,textarea{font:inherit}
 /* Journal owns the screen while open; gameplay DOM HUD/controls must not bleed through. */
 body.journal-open .mobile-controls,
 body.journal-open .crew-status-hud,
-body.journal-open .dialogue-panel { display: none !important; }
+body.journal-open .dialogue-overlay,
+body.journal-open .game-toast { display: none !important; }

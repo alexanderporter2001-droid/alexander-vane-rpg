@@ -25,8 +25,9 @@ export function recruit(save: CampaignSave, id: string): CrewState | null {
     equipmentTags: [...candidate.equipmentTags],
     capabilities: [...candidate.capabilities],
     equipment: emptyEquipmentLoadout(),
-    progression: { experience: 0, specialty: 0.08, techniques: [] },
+    progression: { experience: 0, specialty: candidate.specialty ?? 0.08, techniques: [] },
     recruitedDay: save.world.day,
+    visualArchetype: candidate.visualArchetype,
   };
   save.crew.push(member);
   candidate.available = false;
