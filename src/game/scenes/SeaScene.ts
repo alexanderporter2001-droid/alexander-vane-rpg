@@ -854,6 +854,10 @@ export class SeaScene extends Phaser.Scene {
     save.ship.speed = this.speed;
     save.world.flags.sailingDelegated = this.navigationMode === 'sera';
     SaveManager.save();
+    this.hud.setVisible(false);
+    this.nav.setVisible(false);
+    this.crewHud.setVisible(false);
+    this.mobile?.setVisible(false);
     this.scene.launch('PauseScene', { source: this.scene.key });
     this.scene.pause();
   }
