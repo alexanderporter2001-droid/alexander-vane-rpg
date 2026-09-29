@@ -18,6 +18,7 @@ interface EnemyUnit {
   patrolY: number;
   phase: number;
   windup?: Phaser.GameObjects.Arc;
+  downMarker?: Phaser.GameObjects.Text;
 }
 
 interface CrewUnit {
@@ -50,6 +51,7 @@ export class HarrowScene extends Phaser.Scene {
   private dashReadyAt = 0;
   private dashUntil = 0;
   private lastValid = new Phaser.Math.Vector2(720, 870);
+  private lastFacing = new Phaser.Math.Vector2(1, 0);
   private dead = false;
   private lastSaveAt = 0;
 
@@ -140,6 +142,7 @@ export class HarrowScene extends Phaser.Scene {
         bullet.disableBody(true, true);
         unit.hp = Math.max(0, unit.hp - 10);
         this.hitFlash(unit.sprite);
+        if (unit.hp <= 0) this.downCrew(unit);
       });
     }
 
@@ -166,6 +169,7 @@ export class HarrowScene extends Phaser.Scene {
         order: () => this.cycleOrder(),
         pause: () => this.pauseGame(),
       });
+      this.mobile.setOrderLabel('REGROUP');
     }
 
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
@@ -292,6 +296,7 @@ export class HarrowScene extends Phaser.Scene {
 
     if (this.time.now >= this.dashUntil) {
       const v = this.getMove();
+      if (v.lengthSq() > 0.01) this.lastFacing.copy(v).normalize();
       this.player.setVelocity(v.x * 210, v.y * 210);
     }
 
@@ -455,13 +460,23 @@ export class HarrowScene extends Phaser.Scene {
     this.attackReadyAt = this.time.now + 380;
 
     let facing = this.getMove();
-    if (facing.lengthSq() < 0.01) facing = new Phaser.Math.Vector2(1, 0);
-    facing.normalize();
+    if (facing.lengthSq() > 0.01) {
+      facing.normalize();
+      this.lastFacing.copy(facing);
+    } else {
+      facing = this.lastFacing.clone();
+    }
 
+    if (this.mobile) {
+      const assisted = this.mobileAttackFacing(facing);
+      if (assisted) facing = assisted;
+    }
+
+    const attackRange = this.mobile ? 86 : 72;
     const slash = this.add.arc(
       this.player.x,
       this.player.y,
-      58,
+      attackRange - 12,
       Phaser.Math.RadToDeg(facing.angle() - 0.9),
       Phaser.Math.RadToDeg(facing.angle() + 0.9),
       false,
@@ -473,13 +488,36 @@ export class HarrowScene extends Phaser.Scene {
     for (const enemy of this.enemies) {
       if (enemy.hp <= 0) continue;
       const to = new Phaser.Math.Vector2(enemy.sprite.x - this.player.x, enemy.sprite.y - this.player.y);
-      if (to.length() > 72) continue;
-      if (to.normalize().dot(facing) < 0.05) continue;
+      if (to.length() > attackRange) continue;
+      if (to.clone().normalize().dot(facing) < -0.05) continue;
       enemy.alert = true;
       enemy.hp -= 26;
       this.hitFlash(enemy.sprite);
       if (enemy.hp <= 0) this.downEnemy(enemy);
     }
+  }
+
+  private mobileAttackFacing(baseFacing: Phaser.Math.Vector2): Phaser.Math.Vector2 | null {
+    const target = this.enemies
+      .filter((enemy) => enemy.hp > 0)
+      .map((enemy) => ({
+        enemy,
+        distance: Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.sprite.x, enemy.sprite.y),
+      }))
+      .filter((entry) => entry.distance <= 96)
+      .sort((a, b) => a.distance - b.distance)[0];
+
+    if (!target) return null;
+
+    const toward = new Phaser.Math.Vector2(
+      target.enemy.sprite.x - this.player.x,
+      target.enemy.sprite.y - this.player.y,
+    ).normalize();
+
+    if (baseFacing.lengthSq() > 0.01 && toward.dot(baseFacing) < -0.2) return null;
+
+    this.lastFacing.copy(toward);
+    return toward;
   }
 
   private pull(): void {
@@ -552,7 +590,8 @@ export class HarrowScene extends Phaser.Scene {
     if (this.dead || this.time.now < this.dashReadyAt || save.player.stamina < 18) return;
 
     let v = this.getMove();
-    if (v.lengthSq() < 0.01) v = new Phaser.Math.Vector2(1, 0);
+    if (v.lengthSq() < 0.01) v = this.lastFacing.clone();
+    else this.lastFacing.copy(v).normalize();
     v.normalize();
 
     save.player.stamina -= 18;
@@ -566,6 +605,8 @@ export class HarrowScene extends Phaser.Scene {
     const orders: CaptainOrder[] = ['regroup', 'aggressive', 'defensive', 'protect-sera', 'retreat'];
     const next = (orders.indexOf(this.order) + 1) % orders.length;
     this.order = orders[next] ?? 'regroup';
+    const label = this.order === 'protect-sera' ? 'PROTECT' : this.order.toUpperCase();
+    this.mobile?.setOrderLabel(label);
     this.toast.show(`Captain order: ${this.order.replace('-', ' ')}`);
   }
 
@@ -623,17 +664,45 @@ export class HarrowScene extends Phaser.Scene {
 
   private downEnemy(enemy: EnemyUnit): void {
     enemy.hp = 0;
+    enemy.sprite.setData('down', true);
     enemy.sprite.setVelocity(0, 0);
-    enemy.sprite.setTint(0x6f777a).setAlpha(0.62);
+    enemy.sprite.setAngle(90).setScale(0.82).setTint(0x3e474b).setAlpha(0.82).setDepth(35);
+
     const body = enemy.sprite.body as Phaser.Physics.Arcade.Body;
     body.enable = false;
     enemy.windup?.destroy();
+
+    enemy.downMarker?.destroy();
+    enemy.downMarker = this.add.text(enemy.sprite.x, enemy.sprite.y - 38, 'DOWN', {
+      fontFamily: 'system-ui, sans-serif',
+      fontSize: '11px',
+      fontStyle: 'bold',
+      color: '#f0d8d2',
+      backgroundColor: '#361d1dcc',
+      padding: { x: 6, y: 3 },
+    }).setOrigin(0.5).setDepth(86);
+  }
+
+  private downCrew(unit: CrewUnit): void {
+    if (unit.sprite.getData('down')) return;
+
+    unit.sprite.setData('down', true);
+    unit.sprite.setVelocity(0, 0);
+    unit.sprite.setAngle(90).setScale(0.82).setTint(0x51595c).setAlpha(0.82).setDepth(36);
+
+    const body = unit.sprite.body as Phaser.Physics.Arcade.Body;
+    body.enable = false;
+
+    const name = unit.id === 'sera' ? 'SERA QUILL' : 'ROWAN VALE';
+    unit.label?.setText(`${name} · DOWN`).setColor('#f0c8c0').setAlpha(1);
   }
 
   private hitFlash(target: Phaser.GameObjects.Sprite): void {
     target.setTintFill(0xffffff);
     this.time.delayedCall(80, () => {
-      if (target.active) target.clearTint();
+      if (!target.active) return;
+      if (target.getData('down')) target.setTint(0x3e474b);
+      else target.clearTint();
     });
   }
 
