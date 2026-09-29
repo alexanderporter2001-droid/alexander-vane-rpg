@@ -17,7 +17,7 @@ export class DialoguePanel {
   private root: HTMLDivElement | null = null;
   private closeHandler: (() => void) | undefined;
 
-  constructor(private scene: Phaser.Scene) {
+  constructor(scene: Phaser.Scene) {
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.close(false));
   }
 
