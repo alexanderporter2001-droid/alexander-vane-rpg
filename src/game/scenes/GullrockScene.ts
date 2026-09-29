@@ -638,7 +638,7 @@ export class GullrockScene extends Phaser.Scene {
       formatWorldTime(save),
       `Berries ${save.player.berries.toLocaleString()}`,
       `Gull hull ${Math.ceil(save.ship.hull)}/${save.ship.maxHull} · Supplies ${Math.floor(save.ship.supplies)}`,
-      shouldUseMobileControls()
+      this.mobile
         ? 'Use INTERACT near people and objects'
         : 'F near people and objects',
     ]);
