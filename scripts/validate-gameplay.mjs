@@ -10,6 +10,8 @@ const boot = fs.readFileSync(new URL('../src/game/scenes/BootScene.ts', import.m
 const crewHud = fs.readFileSync(new URL('../src/game/systems/CrewStatusHud.ts', import.meta.url), 'utf8');
 const dialogue = fs.readFileSync(new URL('../src/game/systems/DialoguePanel.ts', import.meta.url), 'utf8');
 const intent = fs.readFileSync(new URL('../src/game/systems/DialogueIntent.ts', import.meta.url), 'utf8');
+const aiDialogue = fs.readFileSync(new URL('../src/game/systems/DialogueAI.ts', import.meta.url), 'utf8');
+const dialogueApi = fs.readFileSync(new URL('../api/dialogue.js', import.meta.url), 'utf8');
 const interactions = fs.readFileSync(new URL('../src/game/systems/InteractionSystem.ts', import.meta.url), 'utf8');
 
 const checks = [
@@ -43,7 +45,7 @@ const checks = [
   ['intent resolver protects unknown Haki knowledge', intent.includes('!save.player.knowledge.hakiKnown')],
   ['moving crew can own interactions', interactions.includes("typeof item.x === 'function'") && interactions.includes("typeof item.y === 'function'")],
   ['Gullrock crew have direct talk interactions', gullrock.includes("id: 'sera'") && gullrock.includes("id: 'rowan'") && gullrock.includes('crewConversation')],
-  ['Gullrock NPCs accept typed intent', gullrock.includes('resolveDialogueIntent') && gullrock.includes('freeform: intentSpeaker')],
+  ['Gullrock NPCs accept AI typed dialogue', gullrock.includes('resolveDialogueAI') && gullrock.includes('freeform: intentSpeaker')],
   ['Gullrock service NPCs use character sprites', boot.includes("'npc-tavern'") && boot.includes("'npc-harbor'") && boot.includes("'npc-provisioner'") && boot.includes("'npc-shipwright'")],
   ['Gullrock no longer uses service NPC circles', !gullrock.includes("this.add.circle(405, 500") && !gullrock.includes("this.add.circle(575, 560")],
   ['Gullrock has environmental market detail', gullrock.includes('Market stalls') && gullrock.includes('Non-interactive locals')],
@@ -58,6 +60,14 @@ const checks = [
   ['ships are blocked from entering island land', sea.includes('isInsideIslandLand(nextX, nextY, port)')],
   ['harbor approach markers are rendered', sea.includes('drawHarborApproach')],
   ['named NPCs can introduce themselves', intent.includes('Dren Pike') && intent.includes('Marta Vell') && intent.includes('Toma Reed') && intent.includes('Brann Cale')],
+  ['dialogue panel waits for async AI replies', dialogue.includes('Promise<string | null>') && dialogue.includes('dialogue-line-thinking')],
+  ['AI dialogue has a local intent fallback', aiDialogue.includes('resolveDialogueIntent') && aiDialogue.includes("source: 'local'")],
+  ['AI dialogue keeps compact per-NPC memories', aiDialogue.includes('dialogueMemory-') && aiDialogue.includes('slice(-6)')],
+  ['dialogue backend uses the OpenAI Responses API', dialogueApi.includes('https://api.openai.com/v1/responses')],
+  ['dialogue backend keeps API key server-side', dialogueApi.includes('process.env.OPENAI_API_KEY') && !aiDialogue.includes('OPENAI_API_KEY')],
+  ['dialogue backend separates crew and world models', dialogueApi.includes('gpt-6-sol') && dialogueApi.includes('gpt-6-luna')],
+  ['dialogue backend restricts browser origins', dialogueApi.includes('ALLOWED_ORIGINS') && dialogueApi.includes('Origin not allowed')],
+  ['Sera dialogue can propose a real course change', sea.includes("result.action?.type === 'set_course'") && sea.includes('this.navTarget = port')],
 ];
 
 let failures = 0;
