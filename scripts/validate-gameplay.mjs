@@ -14,7 +14,7 @@ const checks = [
   ['joystick floats to touch origin', mobile.includes('stickCenterX') && mobile.includes('localX') && mobile.includes("classList.add('is-active')")],
   ['joystick uses pointer capture', mobile.includes('setPointerCapture')],
   ['toast uses native overlay', toast.includes("document.createElement('div')") && toast.includes('game-toast')],
-  ['toast sits below top HUD', style.includes('.game-toast') && style.includes('top:max(104px')],
+  ['toast sits below top HUD', style.includes('.game-toast') && style.includes('top:max(108px')],
   ['combat layout separates primary buttons', style.includes('.mobile-attack') && style.includes('.mobile-dash') && style.includes('.mobile-pull')],
   ['holding attack repeats safely', mobile.includes('setInterval(action, repeatMs)') && mobile.includes('390')],
   ['interact replaces order utility', mobile.includes('!this.interactLabel')],
