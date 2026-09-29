@@ -4,7 +4,7 @@ A private, persistent, consequence-driven pirate RPG built around Alexander Vane
 
 This repository replaces the Floot prototype as the permanent source of truth. Hosting is replaceable; campaign continuity and versioned saves are not.
 
-## Current foundation — v0.3.9
+## Current foundation — v0.3.10
 
 The current vertical slice is built as a complete local loop rather than disconnected demos:
 
@@ -37,6 +37,7 @@ The current vertical slice is built as a complete local loop rather than disconn
 29. Core crew dialogue (Sera and Rowan) routes to the deeper crew model while service NPCs use the lower-cost world model. Model IDs can be changed with server environment variables without rebuilding the game.
 30. Conversations preserve recent turns plus compact per-NPC memories. The server enforces NPC-specific profiles and knowledge boundaries, including the current hidden-Haki rule.
 31. Sera can turn a clear typed course order into a validated in-game destination change instead of merely acknowledging it in dialogue. If the AI service is unavailable, the existing local intent resolver remains the fallback.
+32. Dialogue reliability pass: crew/world calls use no hidden reasoning budget, Sol can retry on Luna when needed, the backend exposes a safe configured/not-configured health check, and local fallback replies show a short diagnostic code instead of failing silently.
 
 Typed freeform dialogue now has a live AI path with structured output, bounded context, persistent compact memories, and a local offline fallback. AI responses may propose only explicitly supported game actions; the simulation remains responsible for applying them.
 
