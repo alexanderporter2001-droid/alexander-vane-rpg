@@ -106,6 +106,9 @@ export class SeaScene extends Phaser.Scene {
   private interiorPlayer?: Phaser.GameObjects.Image;
   private interiorPlayerLocal = new Phaser.Math.Vector2(0, 172);
   private interiorCrew = new Map<string, { sprite: Phaser.GameObjects.Image; label: Phaser.GameObjects.Text; x: number; y: number }>();
+  private rowanArea: 'deck' | 'below' = 'deck';
+  private rowanRoutineAt = 0;
+  private rowanTarget = new Phaser.Math.Vector2(-36, 8);
 
   constructor() { super('SeaScene'); }
 
@@ -184,9 +187,10 @@ export class SeaScene extends Phaser.Scene {
   update(_time: number, deltaMs: number): void {
     const dt = Math.min(0.033, deltaMs / 1000);
     const save = SaveManager.get();
-    // Voyage compression: sea travel takes meaningful real play time while several
-    // in-world hours can pass. ~1 real second = 3.6 in-world minutes underway.
-    if (Math.abs(this.speed) > 8 && !this.arrivalReady) advanceWorldClock(save, dt, 216);
+    // Voyage compression: sea travel remains a real playable stretch aboard ship.
+    // World time still advances faster than wall time, but nearby routes target
+    // roughly 5-10+ minutes rather than collapsing into a minute or two.
+    if (Math.abs(this.speed) > 8 && !this.arrivalReady) advanceWorldClock(save, dt, 72);
 
     if (Math.abs(this.speed) > 25 && save.ship.supplies > 0) {
       save.ship.supplies = Math.max(0, save.ship.supplies - dt * 0.004);
@@ -244,6 +248,7 @@ export class SeaScene extends Phaser.Scene {
     }
 
     this.applyShipVelocity(dt);
+    this.updateCrewShipRoutine(dt);
     this.syncDeckToShip();
     this.updateSeaEncounter(dt);
     this.updateNavigation();
@@ -344,7 +349,7 @@ export class SeaScene extends Phaser.Scene {
     const specialty = sera?.progression.specialty ?? 0;
     // Physical map speed is intentionally slower than the world-clock rate so a
     // multi-hour voyage leaves time to explore the Gull and talk to the crew.
-    const cruiseSpeed = 42 + specialty * 6;
+    const cruiseSpeed = 12 + specialty * 2;
     let targetSpeed = cruiseSpeed;
     if (approachDistance < 520 + awareness) targetSpeed = cruiseSpeed * 0.72;
     if (approachDistance < 250 + awareness * 0.45) targetSpeed = cruiseSpeed * 0.52;
@@ -352,7 +357,7 @@ export class SeaScene extends Phaser.Scene {
 
     const accel = targetSpeed > this.speed ? 54 : 82;
     this.speed = Phaser.Math.Linear(this.speed, targetSpeed, Phaser.Math.Clamp((accel * dt) / 160, 0, 1));
-    this.speed = Phaser.Math.Clamp(this.speed, 0, 82);
+    this.speed = Phaser.Math.Clamp(this.speed, 0, 28);
   }
 
   private getAutopilotPoint(): Phaser.Math.Vector2 {
@@ -388,6 +393,40 @@ export class SeaScene extends Phaser.Scene {
     const taper = Math.abs(this.deckPlayerLocal.y) > 74 ? 54 : 66;
     this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x, -taper, taper);
     this.deckPlayer.setPosition(this.deckPlayerLocal.x, this.deckPlayerLocal.y);
+  }
+
+  private updateCrewShipRoutine(dt: number): void {
+    const rowanDeck = this.deckCrew.get('rowan');
+    const rowanBelow = this.interiorCrew.get('rowan');
+    if (!rowanDeck || !rowanBelow || this.boardingActive) return;
+
+    const now = this.time.now;
+    if (this.rowanRoutineAt === 0) this.rowanRoutineAt = now + 12000;
+    if (now >= this.rowanRoutineAt) {
+      // Rowan has his own shipboard routine. He may change decks or pick a new
+      // place to spend time without following Alexander between areas.
+      const phase = Math.floor(SaveManager.get().world.minuteOfDay / 45) + Math.floor(now / 15000);
+      if (phase % 4 === 0) this.rowanArea = this.rowanArea === 'deck' ? 'below' : 'deck';
+      const deckSpots = [[-42, 20], [44, 42], [-30, -34], [38, -18]] as const;
+      const belowSpots = [[-92, 28], [-92, -108], [88, 18], [-108, 126], [76, 126]] as const;
+      const spots = this.rowanArea === 'deck' ? deckSpots : belowSpots;
+      const pick = spots[Math.abs(phase) % spots.length]!;
+      this.rowanTarget.set(pick[0], pick[1]);
+      this.rowanRoutineAt = now + 12000 + (Math.abs(phase) % 4) * 5000;
+    }
+
+    const view = this.rowanArea === 'deck' ? rowanDeck : rowanBelow;
+    const hidden = this.rowanArea === 'deck' ? rowanBelow : rowanDeck;
+    hidden.sprite.setVisible(false);
+    hidden.label.setVisible(false);
+    view.sprite.setVisible(true);
+    view.label.setVisible(true);
+
+    const step = 24 * dt;
+    view.x = Phaser.Math.Linear(view.x, this.rowanTarget.x, Phaser.Math.Clamp(step / 60, 0, 1));
+    view.y = Phaser.Math.Linear(view.y, this.rowanTarget.y, Phaser.Math.Clamp(step / 60, 0, 1));
+    view.sprite.setPosition(view.x, view.y);
+    view.label.setPosition(view.x, view.y - (this.rowanArea === 'deck' ? 41 : 35));
   }
 
   private applyShipVelocity(dt: number): void {
@@ -636,7 +675,7 @@ export class SeaScene extends Phaser.Scene {
     const minute = save.world.minuteOfDay;
     const isNight = minute >= 21 * 60 || minute < 6 * 60;
     const positions = new Map<string, { x: number; y: number }>();
-    positions.set('rowan', { x: -92, y: isNight ? 8 : 28 });
+    positions.set('rowan', { x: -92, y: isNight ? -108 : 28 });
     if (this.navigationMode !== 'sera') positions.set('sera', { x: 92, y: -105 });
 
     let berth = 0;
