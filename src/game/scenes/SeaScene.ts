@@ -177,7 +177,7 @@ export class SeaScene extends Phaser.Scene {
     this.wake = particles;
 
     if (this.navigationMode === 'sera') {
-      if (Math.abs(this.speed) < 35) this.speed = 52;
+      if (Math.abs(this.speed) < 8) this.speed = 8;
       this.toast.show(`Sera takes the helm for ${this.navTarget.name}. You are free to move around the deck.`, 3600);
     } else {
       this.toast.show('No navigator is currently handling the helm. Alexander must steer.', 3300);
@@ -425,8 +425,8 @@ export class SeaScene extends Phaser.Scene {
     const step = 24 * dt;
     view.x = Phaser.Math.Linear(view.x, this.rowanTarget.x, Phaser.Math.Clamp(step / 60, 0, 1));
     view.y = Phaser.Math.Linear(view.y, this.rowanTarget.y, Phaser.Math.Clamp(step / 60, 0, 1));
-    view.sprite.setPosition(view.x, view.y);
-    view.label.setPosition(view.x, view.y - (this.rowanArea === 'deck' ? 41 : 35));
+    view.sprite.setPosition(Math.round(view.x), Math.round(view.y));
+    view.label.setPosition(Math.round(view.x), Math.round(view.y - (this.rowanArea === 'deck' ? 41 : 35)));
   }
 
   private applyShipVelocity(dt: number): void {
@@ -479,7 +479,7 @@ export class SeaScene extends Phaser.Scene {
 
     this.navigationMode = 'sera';
     SaveManager.get().world.flags.sailingDelegated = true;
-    if (this.speed < 35) this.speed = 52;
+    if (this.speed < 8) this.speed = 8;
     this.toast.show(`Sera takes the helm and resumes the course for ${this.navTarget.name}.`, 2900);
     this.applyNavigationPresentation();
     SaveManager.save();
@@ -628,8 +628,10 @@ export class SeaScene extends Phaser.Scene {
   }
 
   private syncDeckToShip(): void {
-    this.deck?.setPosition(this.ship.x, this.ship.y);
-    this.interior?.setPosition(this.ship.x, this.ship.y);
+    const x = Math.round(this.ship.x);
+    const y = Math.round(this.ship.y);
+    this.deck?.setPosition(x, y);
+    this.interior?.setPosition(x, y);
   }
 
   private createShipInterior(): void {
