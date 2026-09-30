@@ -249,7 +249,7 @@ export class SeaScene extends Phaser.Scene {
 
     this.applyShipVelocity(dt);
     this.updateCrewShipRoutine(dt);
-    this.syncDeckToShip();
+    if (this.navigationMode !== 'sera') this.syncDeckToShip();
     this.updateSeaEncounter(dt);
     this.updateNavigation();
     this.updateNightOverlay();
@@ -485,6 +485,13 @@ export class SeaScene extends Phaser.Scene {
     SaveManager.save();
   }
 
+  private centerShipboardView(): void {
+    const x = Math.round(this.scale.width / 2);
+    const y = Math.round(this.scale.height / 2);
+    this.deck?.setPosition(x, y);
+    this.interior?.setPosition(x, y);
+  }
+
   private applyNavigationPresentation(showToast = true): void {
     const delegated = this.navigationMode === 'sera';
     const deckMode = delegated && !this.arrivalReady;
@@ -496,12 +503,16 @@ export class SeaScene extends Phaser.Scene {
       this.ship.setVisible(false);
       if (this.shipArea === 'deck') this.deck?.setVisible(true);
       else this.interior?.setVisible(true);
-      this.cameras.main.startFollow(this.ship, true, 1, 1);
+      this.cameras.main.stopFollow();
+      this.cameras.main.setScroll(0, 0);
       this.cameras.main.setZoom(this.scale.width < 700 ? 1.55 : 1.42);
+      this.centerShipboardView();
       this.mobile?.setOrderLabel('TAKE HELM');
     } else if (delegated) {
-      this.cameras.main.startFollow(this.ship, true, 1, 1);
+      this.cameras.main.stopFollow();
+      this.cameras.main.setScroll(0, 0);
       this.cameras.main.setZoom(this.scale.width < 700 ? 1.55 : 1.42);
+      this.centerShipboardView();
       this.mobile?.setOrderLabel('TAKE HELM');
       if (showToast) this.toast.show('Sera has the course. Move freely around the deck.', 2300);
     } else {
@@ -553,7 +564,7 @@ export class SeaScene extends Phaser.Scene {
   }
 
   private createDeckView(): void {
-    const deck = this.add.container(this.ship.x, this.ship.y).setDepth(310);
+    const deck = this.add.container(this.ship.x, this.ship.y).setDepth(310).setScrollFactor(0);
 
     const g = this.add.graphics();
     g.fillStyle(0x0b0d0e, 0.28).fillEllipse(0, 12, 210, 320);
@@ -635,7 +646,7 @@ export class SeaScene extends Phaser.Scene {
   }
 
   private createShipInterior(): void {
-    const interior = this.add.container(this.ship.x, this.ship.y).setDepth(315).setVisible(false);
+    const interior = this.add.container(this.ship.x, this.ship.y).setDepth(315).setVisible(false).setScrollFactor(0);
     const g = this.add.graphics();
     g.fillStyle(0x20160f, 0.98).fillRoundedRect(-180, -225, 360, 450, 34);
     g.lineStyle(6, 0x8a6844, 1).strokeRoundedRect(-180, -225, 360, 450, 34);
