@@ -79,6 +79,11 @@ export class MobileControls {
     this.joystick.addEventListener('pointerup', this.onStickEnd);
     this.joystick.addEventListener('pointercancel', this.onStickEnd);
     this.joystick.addEventListener('lostpointercapture', this.onStickEnd);
+    // iOS embedded browsers can reject/lose pointer capture. Window-level
+    // listeners keep the stick tracking after the initial touch either way.
+    window.addEventListener('pointermove', this.onWindowStickMove, { passive: false });
+    window.addEventListener('pointerup', this.onWindowStickEnd, { passive: false });
+    window.addEventListener('pointercancel', this.onWindowStickEnd, { passive: false });
 
     this.resetVisualCenter();
     this.refreshVisibility();
@@ -117,6 +122,9 @@ export class MobileControls {
     this.joystick.removeEventListener('pointerup', this.onStickEnd);
     this.joystick.removeEventListener('pointercancel', this.onStickEnd);
     this.joystick.removeEventListener('lostpointercapture', this.onStickEnd);
+    window.removeEventListener('pointermove', this.onWindowStickMove);
+    window.removeEventListener('pointerup', this.onWindowStickEnd);
+    window.removeEventListener('pointercancel', this.onWindowStickEnd);
     this.root.remove();
   }
 
@@ -216,6 +224,18 @@ export class MobileControls {
     event.preventDefault();
     event.stopPropagation();
     this.updateStick(event);
+  };
+
+  private onWindowStickMove = (event: PointerEvent): void => {
+    if (event.pointerId !== this.pointerId) return;
+    event.preventDefault();
+    this.updateStick(event);
+  };
+
+  private onWindowStickEnd = (event: PointerEvent): void => {
+    if (event.pointerId !== this.pointerId) return;
+    event.preventDefault();
+    this.resetStick();
   };
 
   private onStickEnd = (event: PointerEvent): void => {
