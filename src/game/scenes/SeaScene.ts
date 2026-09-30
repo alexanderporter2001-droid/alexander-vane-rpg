@@ -496,11 +496,11 @@ export class SeaScene extends Phaser.Scene {
       this.ship.setVisible(false);
       if (this.shipArea === 'deck') this.deck?.setVisible(true);
       else this.interior?.setVisible(true);
-      this.cameras.main.startFollow(this.ship, true, 0.12, 0.12);
+      this.cameras.main.startFollow(this.ship, true, 1, 1);
       this.cameras.main.setZoom(this.scale.width < 700 ? 1.55 : 1.42);
       this.mobile?.setOrderLabel('TAKE HELM');
     } else if (delegated) {
-      this.cameras.main.startFollow(this.ship, true, 0.12, 0.12);
+      this.cameras.main.startFollow(this.ship, true, 1, 1);
       this.cameras.main.setZoom(this.scale.width < 700 ? 1.55 : 1.42);
       this.mobile?.setOrderLabel('TAKE HELM');
       if (showToast) this.toast.show('Sera has the course. Move freely around the deck.', 2300);
@@ -991,7 +991,7 @@ export class SeaScene extends Phaser.Scene {
     this.ship.setVelocity(0, 0);
     this.ship.setVisible(false);
     this.deck.setVisible(true);
-    this.cameras.main.startFollow(this.ship, true, 0.12, 0.12);
+    this.cameras.main.startFollow(this.ship, true, 1, 1);
     this.cameras.main.setZoom(this.scale.width < 700 ? 1.58 : 1.44);
     this.mobile?.setCombatVisible(true);
     this.mobile?.setInteract(null);
