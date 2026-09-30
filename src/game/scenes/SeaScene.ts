@@ -184,7 +184,9 @@ export class SeaScene extends Phaser.Scene {
   update(_time: number, deltaMs: number): void {
     const dt = Math.min(0.033, deltaMs / 1000);
     const save = SaveManager.get();
-    if (Math.abs(this.speed) > 8 && !this.arrivalReady) advanceWorldClock(save, dt, 60);
+    // Voyage compression: sea travel takes meaningful real play time while several
+    // in-world hours can pass. ~1 real second = 3.6 in-world minutes underway.
+    if (Math.abs(this.speed) > 8 && !this.arrivalReady) advanceWorldClock(save, dt, 216);
 
     if (Math.abs(this.speed) > 25 && save.ship.supplies > 0) {
       save.ship.supplies = Math.max(0, save.ship.supplies - dt * 0.004);
@@ -340,7 +342,9 @@ export class SeaScene extends Phaser.Scene {
     const awareness = sera ? equippedEffects(sera.equipment).seaAwarenessBonus : 0;
 
     const specialty = sera?.progression.specialty ?? 0;
-    const cruiseSpeed = (3.8 + specialty * 1.4) * 60;
+    // Physical map speed is intentionally slower than the world-clock rate so a
+    // multi-hour voyage leaves time to explore the Gull and talk to the crew.
+    const cruiseSpeed = 42 + specialty * 6;
     let targetSpeed = cruiseSpeed;
     if (approachDistance < 520 + awareness) targetSpeed = cruiseSpeed * 0.72;
     if (approachDistance < 250 + awareness * 0.45) targetSpeed = cruiseSpeed * 0.52;
@@ -348,7 +352,7 @@ export class SeaScene extends Phaser.Scene {
 
     const accel = targetSpeed > this.speed ? 54 : 82;
     this.speed = Phaser.Math.Linear(this.speed, targetSpeed, Phaser.Math.Clamp((accel * dt) / 160, 0, 1));
-    this.speed = Phaser.Math.Clamp(this.speed, 0, 260);
+    this.speed = Phaser.Math.Clamp(this.speed, 0, 82);
   }
 
   private getAutopilotPoint(): Phaser.Math.Vector2 {
