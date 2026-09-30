@@ -184,7 +184,7 @@ export class SeaScene extends Phaser.Scene {
   update(_time: number, deltaMs: number): void {
     const dt = Math.min(0.033, deltaMs / 1000);
     const save = SaveManager.get();
-    advanceWorldClock(save, dt, 5.5);
+    if (Math.abs(this.speed) > 8 && !this.arrivalReady) advanceWorldClock(save, dt, 60);
 
     if (Math.abs(this.speed) > 25 && save.ship.supplies > 0) {
       save.ship.supplies = Math.max(0, save.ship.supplies - dt * 0.004);
@@ -339,14 +339,16 @@ export class SeaScene extends Phaser.Scene {
     const sera = SaveManager.get().crew.find((member) => member.id === 'sera');
     const awareness = sera ? equippedEffects(sera.equipment).seaAwarenessBonus : 0;
 
-    let targetSpeed = 155;
-    if (approachDistance < 520 + awareness) targetSpeed = 92;
-    if (approachDistance < 250 + awareness * 0.45) targetSpeed = 54;
-    if (approachDistance < 110 + awareness * 0.2) targetSpeed = 24;
+    const specialty = sera?.progression.specialty ?? 0;
+    const cruiseSpeed = (3.8 + specialty * 1.4) * 60;
+    let targetSpeed = cruiseSpeed;
+    if (approachDistance < 520 + awareness) targetSpeed = cruiseSpeed * 0.72;
+    if (approachDistance < 250 + awareness * 0.45) targetSpeed = cruiseSpeed * 0.52;
+    if (approachDistance < 110 + awareness * 0.2) targetSpeed = cruiseSpeed * 0.3;
 
     const accel = targetSpeed > this.speed ? 54 : 82;
     this.speed = Phaser.Math.Linear(this.speed, targetSpeed, Phaser.Math.Clamp((accel * dt) / 160, 0, 1));
-    this.speed = Phaser.Math.Clamp(this.speed, 0, 170);
+    this.speed = Phaser.Math.Clamp(this.speed, 0, 260);
   }
 
   private getAutopilotPoint(): Phaser.Math.Vector2 {
@@ -448,8 +450,11 @@ export class SeaScene extends Phaser.Scene {
     this.interior?.setVisible(deckMode && this.shipArea === 'below');
 
     if (delegated && this.arrivalReady) {
-      this.cameras.main.startFollow(this.ship, true, 0.07, 0.07);
-      this.cameras.main.setZoom(this.scale.width < 700 ? 1.08 : 1.02);
+      this.ship.setVisible(false);
+      if (this.shipArea === 'deck') this.deck?.setVisible(true);
+      else this.interior?.setVisible(true);
+      this.cameras.main.startFollow(this.ship, true, 0.12, 0.12);
+      this.cameras.main.setZoom(this.scale.width < 700 ? 1.55 : 1.42);
       this.mobile?.setOrderLabel('TAKE HELM');
     } else if (delegated) {
       this.cameras.main.startFollow(this.ship, true, 0.12, 0.12);
