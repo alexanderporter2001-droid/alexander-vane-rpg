@@ -422,8 +422,8 @@ export class SeaScene extends Phaser.Scene {
   private updateHeroAnimation():void{
     const bob=0;
     if(this.navigationMode==='sera'){
-      const sera=this.deckCrew.get('sera');if(sera?.sprite.visible){sera.sprite.setTexture(heroTexture('sera','down',Math.floor(this.time.now/850)%2));sera.sprite.setAngle(Math.sin(this.time.now*.0016)*.7);}
-      const rowan=this.rowanArea==='deck'?this.deckCrew.get('rowan'):this.interiorCrew.get('rowan');if(rowan?.sprite.visible){const dx=this.rowanTarget.x-rowan.x,dy=this.rowanTarget.y-rowan.y;const facing=facingFromMotion(dx,dy,'down');rowan.sprite.setTexture(heroTexture('rowan',facing,(Math.abs(dx)+Math.abs(dy)>5)?Math.floor(this.time.now/210)%2:0));}
+      const sera=this.deckCrew.get('sera');if(sera?.sprite.visible){sera.sprite.setTexture(this.textures.exists('prod-sera')?'prod-sera':heroTexture('sera','down',Math.floor(this.time.now/850)%2));sera.sprite.setAngle(Math.sin(this.time.now*.0016)*.7);}
+      const rowan=this.rowanArea==='deck'?this.deckCrew.get('rowan'):this.interiorCrew.get('rowan');if(rowan?.sprite.visible){const dx=this.rowanTarget.x-rowan.x,dy=this.rowanTarget.y-rowan.y;const facing=facingFromMotion(dx,dy,'down');rowan.sprite.setTexture(this.textures.exists('prod-rowan')?'prod-rowan':heroTexture('rowan',facing,(Math.abs(dx)+Math.abs(dy)>5)?Math.floor(this.time.now/210)%2:0)); rowan.sprite.setFlipX(facing==='left');}
     }
     this.deckPlayer?.setAngle(bob);
   }
@@ -639,7 +639,7 @@ export class SeaScene extends Phaser.Scene {
     for (const member of save.crew) {
       const atHelm=member.capabilities.includes('helm')&&member.id==='sera';
       const p=atHelm?[98,-154] as const:crewSpots[slot++%crewSpots.length]!;
-      const sprite=this.add.image(p[0],p[1],member.id==='sera'?heroTexture('sera','down',0):member.id==='rowan'?heroTexture('rowan','down',0):this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(member.id==='rowan'?.47:.44).setDepth(12);
+      const sprite=this.add.image(p[0],p[1],this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(member.id==='rowan'?.47:.44).setDepth(12);
       const contact=this.add.ellipse(p[0],p[1]+24,32,10,0x050607,.3).setDepth(9);
       const label=this.add.text(p[0],p[1]-42,atHelm?'Sera · helm':member.name.split(' ')[0]??member.name,{fontFamily:'Georgia, serif',fontSize:'6px',fontStyle:'bold',color:'#f4e4c5',backgroundColor:'#0b09079c',padding:{x:4,y:2}}).setOrigin(.5).setDepth(14);
       sprite.setData('shadow',contact);
@@ -650,8 +650,8 @@ export class SeaScene extends Phaser.Scene {
   }
 
   private crewTexture(id: string, visualArchetype: string | undefined, role: string): string {
-    if (id === 'sera') return heroTexture('sera','down',0);
-    if (id === 'rowan') return heroTexture('rowan','down',0);
+    if (id === 'sera') return this.textures.exists('prod-sera') ? 'prod-sera' : heroTexture('sera','down',0);
+    if (id === 'rowan') return this.textures.exists('prod-rowan') ? 'prod-rowan' : heroTexture('rowan','down',0);
     if (visualArchetype === 'crew-medic') return 'crew-medic';
     if (visualArchetype === 'crew-fighter' || role.toLowerCase().includes('fighter')) return heroTexture('rowan','down',0);
     return 'crew-specialist';
@@ -682,7 +682,7 @@ export class SeaScene extends Phaser.Scene {
       if(member.id==='sera'&&this.navigationMode==='sera')continue;
       const p=positions.get(member.id)??{x:-128+(berth%3)*52,y:125+Math.floor(berth/3)*30};if(!positions.has(member.id))berth++;
       const contact=this.add.ellipse(p.x,p.y+21,28,9,0x050607,.3).setDepth(8);
-      const sprite=this.add.image(p.x,p.y,member.id==='sera'?heroTexture('sera','down',0):member.id==='rowan'?heroTexture('rowan','down',0):this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(.36).setDepth(10);
+      const sprite=this.add.image(p.x,p.y,this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(.36).setDepth(10);
       const label=this.add.text(p.x,p.y-34,member.name.split(' ')[0]??member.name,{fontFamily:'Georgia, serif',fontSize:'7px',fontStyle:'bold',color:'#f0dfc4',backgroundColor:'#100b087d',padding:{x:3,y:1}}).setOrigin(.5).setDepth(12);
       sprite.setData('shadow',contact);interior.add([contact,sprite,label]);this.interiorCrew.set(member.id,{sprite,label,x:p.x,y:p.y});
     }
