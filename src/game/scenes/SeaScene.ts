@@ -650,10 +650,10 @@ export class SeaScene extends Phaser.Scene {
   }
 
   private crewTexture(id: string, visualArchetype: string | undefined, role: string): string {
-    if (id === 'sera') return 'sera';
-    if (id === 'rowan') return 'rowan';
+    if (id === 'sera') return heroTexture('sera','down',0);
+    if (id === 'rowan') return heroTexture('rowan','down',0);
     if (visualArchetype === 'crew-medic') return 'crew-medic';
-    if (visualArchetype === 'crew-fighter' || role.toLowerCase().includes('fighter')) return 'rowan';
+    if (visualArchetype === 'crew-fighter' || role.toLowerCase().includes('fighter')) return heroTexture('rowan','down',0);
     return 'crew-specialist';
   }
 
