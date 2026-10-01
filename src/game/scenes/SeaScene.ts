@@ -90,7 +90,7 @@ export class SeaScene extends Phaser.Scene {
     x: number;
     y: number;
   }>();
-  private deckPlayerLocal = new Phaser.Math.Vector2(0, 62);
+  private deckPlayerLocal = new Phaser.Math.Vector2(0, 70);
   private encounterTravel = 0;
   private activeEncounter: WorldEncounterState | null = null;
   private encounterShip?: Phaser.GameObjects.Image;
@@ -574,7 +574,7 @@ export class SeaScene extends Phaser.Scene {
     vignette.lineStyle(2, 0xf0c77a, 0.18).strokeEllipse(0, 10, 470, 590);
 
     this.deckPlayer = this.add.image(this.deckPlayerLocal.x, this.deckPlayerLocal.y, 'alexander')
-      .setScale(0.68).setDepth(12);
+      .setScale(0.52).setDepth(12);
     deck.add([art, vignette, this.deckPlayer]);
     this.deckCrew.clear();
 
@@ -583,13 +583,13 @@ export class SeaScene extends Phaser.Scene {
     const crewSpots = [[-118,20],[-45,-45],[108,52],[-96,105],[72,112]] as const;
     for (const member of save.crew) {
       const atHelm = member.capabilities.includes('helm') && member.id === 'sera';
-      const p = atHelm ? [90,-155] as const : crewSpots[slot++ % crewSpots.length]!;
+      const p = atHelm ? [90,-150] as const : crewSpots[slot++ % crewSpots.length]!;
       const x=p[0], y=p[1];
       const sprite=this.add.image(x,y,this.crewTexture(member.id,member.visualArchetype,member.role))
-        .setScale(member.id==='rowan'?0.64:0.60).setDepth(11);
+        .setScale(member.id==='rowan'?0.51:0.49).setDepth(11);
       const label=this.add.text(x,y-48,atHelm?member.name.split(' ')[0]+' · HELM':member.name.split(' ')[0]??member.name,{
-        fontFamily:'Georgia, serif',fontSize:'10px',fontStyle:'bold',color:'#f7e5c8',
-        backgroundColor:'#0d0907d9',padding:{x:6,y:3},
+        fontFamily:'Georgia, serif',fontSize:'9px',fontStyle:'bold',color:'#f7e5c8',
+        backgroundColor:'#0d0907bf',padding:{x:5,y:2},
       }).setOrigin(0.5).setDepth(13);
       if(member.hp<=0){sprite.setTint(0x555b5f).setAlpha(0.7).setAngle(90);label.setText(member.name.split(' ')[0]+' · DOWN').setColor('#ffd3ca');}
       this.deckCrew.set(member.id,{sprite,label,x,y}); deck.add([sprite,label]);
@@ -647,7 +647,7 @@ export class SeaScene extends Phaser.Scene {
     g.fillStyle(0x5d432c, 1).fillRoundedRect(58, -4, 72, 34, 5);
     g.fillStyle(0x4d3523, 1).fillRoundedRect(54, 118, 82, 42, 4);
 
-    this.interiorPlayer = this.add.image(this.interiorPlayerLocal.x, this.interiorPlayerLocal.y, 'alexander').setScale(0.58).setDepth(8);
+    this.interiorPlayer = this.add.image(this.interiorPlayerLocal.x, this.interiorPlayerLocal.y, 'alexander').setScale(0.44).setDepth(8);
     interior.add([g, ...texts, this.interiorPlayer]);
     this.interiorCrew.clear();
 
@@ -663,7 +663,7 @@ export class SeaScene extends Phaser.Scene {
       if (member.id === 'sera' && this.navigationMode === 'sera') continue;
       const p = positions.get(member.id) ?? { x: -120 + (berth % 3) * 54, y: 132 + Math.floor(berth / 3) * 32 };
       if (!positions.has(member.id)) berth += 1;
-      const sprite = this.add.image(p.x, p.y, this.crewTexture(member.id, member.visualArchetype, member.role)).setScale(0.48).setDepth(7);
+      const sprite = this.add.image(p.x, p.y, this.crewTexture(member.id, member.visualArchetype, member.role)).setScale(0.41).setDepth(7);
       const label = this.add.text(p.x, p.y - 35, member.name.split(' ')[0] ?? member.name, {
         fontFamily: 'system-ui, sans-serif', fontSize: '8px', fontStyle: 'bold',
         color: '#f0dfc4', backgroundColor: '#120c08bb', padding: { x: 3, y: 1 },
@@ -854,7 +854,7 @@ export class SeaScene extends Phaser.Scene {
             if (result.action.target === 'sera' && this.canSeraNavigate()) {
               this.navigationMode = 'sera';
               current.world.flags.sailingDelegated = true;
-              if (this.speed < 35) this.speed = 52;
+              if (this.speed < 8) this.speed = 8;
               this.applyNavigationPresentation(false);
             } else if (result.action.target === 'alexander') {
               this.navigationMode = 'manual';
