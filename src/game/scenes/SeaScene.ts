@@ -584,7 +584,7 @@ export class SeaScene extends Phaser.Scene {
 
   private updateShipboardAtmosphere(dt:number): void {
     if(!this.shipboardSea||!this.shipboardFoam)return;
-    const onboard=this.navigationMode==='sera'&&(this.deck?.visible||this.interior?.visible);
+    const onboard=this.navigationMode==='sera'&&Boolean(this.deck?.visible||this.interior?.visible);
     this.shipboardSea.setVisible(onboard&&this.shipArea==='deck');
     this.shipboardFoam.setVisible(onboard&&this.shipArea==='deck');
     if(!onboard||this.shipArea!=='deck')return;
