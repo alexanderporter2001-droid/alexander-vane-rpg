@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { heroTexture } from '../visual/PirateCharacters';
+import { addProductionGround, addProductionClutter } from '../visual/EnvironmentArt';
 import { SaveManager } from '../state/SaveManager';
 import type { CaptainOrder } from '../state/types';
 import { CrewStatusHud } from '../systems/CrewStatusHud';
@@ -904,6 +905,8 @@ export class HarrowScene extends Phaser.Scene {
   }
 
   private drawHarbor(): void {
+    addProductionGround(this,this.worldW,this.worldH,0x48415252,'harbor',-21);
+    addProductionClutter(this,0x48415252,[[180,620],[320,760],[570,580],[805,610],[930,470],[1060,335],[1210,320],[1330,600]],-7);
     this.add.rectangle(this.worldW / 2, this.worldH / 2, this.worldW, this.worldH, 0x173b49).setDepth(-20);
 
     const water = this.add.graphics().setDepth(-19);
