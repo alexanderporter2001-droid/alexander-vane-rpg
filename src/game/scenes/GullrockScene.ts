@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { heroTexture } from '../visual/PirateCharacters';
 import { SaveManager } from '../state/SaveManager';
 import { DialoguePanel, type DialogueChoice } from '../systems/DialoguePanel';
 import type { DialogueSpeakerId } from '../systems/DialogueIntent';
@@ -48,7 +49,7 @@ export class GullrockScene extends Phaser.Scene {
     const savedSpawn = this.isWalkable(save.player.position.x, save.player.position.y)
       ? save.player.position
       : { x: 725, y: 790 };
-    this.player = this.physics.add.sprite(savedSpawn.x, savedSpawn.y, 'alexander').setDepth(50).setCollideWorldBounds(true);
+    this.player = this.physics.add.sprite(savedSpawn.x, savedSpawn.y, this.textures.exists('prod-alexander') ? 'prod-alexander' : heroTexture('alexander','down',0)).setDepth(50).setCollideWorldBounds(true);
     this.player.setBodySize(34, 30).setOffset(19, 70);
     this.lastValid.set(savedSpawn.x, savedSpawn.y);
 
@@ -194,10 +195,10 @@ export class GullrockScene extends Phaser.Scene {
   }
 
   private crewTexture(id: string, visualArchetype: string | undefined, role: string): string {
-    if (id === 'sera') return 'sera';
-    if (id === 'rowan') return 'rowan';
+    if (id === 'sera') return heroTexture('sera','down',0);
+    if (id === 'rowan') return heroTexture('rowan','down',0);
     if (visualArchetype === 'crew-medic') return 'crew-medic';
-    if (visualArchetype === 'crew-fighter' || role.toLowerCase().includes('fighter')) return 'rowan';
+    if (visualArchetype === 'crew-fighter' || role.toLowerCase().includes('fighter')) return heroTexture('rowan','down',0);
     return 'crew-specialist';
   }
 
