@@ -388,9 +388,9 @@ export class SeaScene extends Phaser.Scene {
       return;
     }
     if (!this.deckPlayer) return;
-    this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x + move.x * 118 * dt, -145, 155);
-    this.deckPlayerLocal.y = Phaser.Math.Clamp(this.deckPlayerLocal.y + move.y * 118 * dt, -108, 124);
-    const taper = this.deckPlayerLocal.y < -70 ? 120 : 155;
+    this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x + move.x * 118 * dt, -165, 170);
+    this.deckPlayerLocal.y = Phaser.Math.Clamp(this.deckPlayerLocal.y + move.y * 118 * dt, -190, 185);
+    const taper = this.deckPlayerLocal.y < -125 ? 125 : 170;
     this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x, -taper, taper);
     this.deckPlayer.setPosition(this.deckPlayerLocal.x, this.deckPlayerLocal.y);
   }
@@ -565,91 +565,32 @@ export class SeaScene extends Phaser.Scene {
 
   private createDeckView(): void {
     const deck = this.add.container(this.ship.x, this.ship.y).setDepth(310).setScrollFactor(0);
-    const g = this.add.graphics();
 
-    // Illustrated shipboard presentation: a warm, angled deck with layered hull,
-    // rails, planking, rigging, props and light. Gameplay coordinates stay local
-    // so this remains stable while Sera sails the world map underneath.
-    g.fillStyle(0x06131b, 0.32).fillEllipse(0, 32, 430, 350);
-    g.fillStyle(0x3a2418, 1);
-    g.fillPoints([new Phaser.Geom.Point(-188,-122),new Phaser.Geom.Point(142,-154),new Phaser.Geom.Point(202,96),new Phaser.Geom.Point(-116,154)], true);
-    g.lineStyle(9, 0x25160f, 1);
-    g.strokePoints([new Phaser.Geom.Point(-188,-122),new Phaser.Geom.Point(142,-154),new Phaser.Geom.Point(202,96),new Phaser.Geom.Point(-116,154)], true);
-    g.fillStyle(0x855a32, 1);
-    g.fillPoints([new Phaser.Geom.Point(-172,-110),new Phaser.Geom.Point(128,-140),new Phaser.Geom.Point(184,84),new Phaser.Geom.Point(-106,140)], true);
+    // Render the ship as one prerendered art texture instead of live geometry.
+    // The texture is deliberately oversized so the mobile camera reads it as
+    // a place Alexander is standing on, not a diagram under the characters.
+    const art = this.add.image(0, 0, 'wayward-deck-art').setDisplaySize(520, 650).setDepth(0);
+    const vignette = this.add.graphics().setDepth(1);
+    vignette.lineStyle(2, 0xf0c77a, 0.18).strokeEllipse(0, 10, 470, 590);
 
-    // diagonal planks sell the isometric perspective
-    g.lineStyle(2, 0x56351f, 0.72);
-    for (let y=-100;y<=120;y+=18) g.lineBetween(-155,y,165,y-28);
-    g.lineStyle(2,0xb27b43,0.34);
-    for (let x=-145;x<=145;x+=30) g.lineBetween(x,-112,x+48,118);
-
-    // raised stern / helm
-    g.fillStyle(0x4b2d1b,1).fillPoints([
-      new Phaser.Geom.Point(42,-112),new Phaser.Geom.Point(126,-124),
-      new Phaser.Geom.Point(148,-50),new Phaser.Geom.Point(58,-38)
-    ],true);
-    g.lineStyle(4,0xd0a064,0.9).strokePoints([
-      new Phaser.Geom.Point(42,-112),new Phaser.Geom.Point(126,-124),
-      new Phaser.Geom.Point(148,-50),new Phaser.Geom.Point(58,-38)
-    ],true);
-    g.fillStyle(0x25170f,1).fillCircle(96,-82,22);
-    g.lineStyle(5,0xc08b4c,1).strokeCircle(96,-82,22);
-    for(let a=0;a<Math.PI*2;a+=Math.PI/4) g.lineBetween(96+Math.cos(a)*13,-82+Math.sin(a)*13,96+Math.cos(a)*29,-82+Math.sin(a)*29);
-
-    // masts, ropes and railings
-    g.fillStyle(0x3b2417,1).fillRoundedRect(-74,-137,18,248,7);
-    g.fillStyle(0x9b6939,1).fillRoundedRect(-69,-137,8,248,4);
-    g.fillStyle(0x3b2417,1).fillRoundedRect(24,-132,15,188,6);
-    g.lineStyle(3,0xc99a5d,0.9);
-    g.lineBetween(-65,-120,-152,-66); g.lineBetween(-65,-105,156,-112);
-    g.lineBetween(31,-112,171,-15); g.lineBetween(-65,-70,-148,72);
-    g.lineStyle(5,0xe1b879,0.95);
-    g.lineBetween(-162,-92,-98,126); g.lineBetween(137,-122,183,70);
-
-    // hatch, stairs, cargo and lantern pools
-    g.fillStyle(0x241710,1).fillRoundedRect(-12,18,86,58,7);
-    g.lineStyle(4,0xc39458,1).strokeRoundedRect(-12,18,86,58,7);
-    for(let y=28;y<70;y+=11) g.lineBetween(-4,y,66,y);
-    const crates=[[-126,55],[-105,79],[116,42],[137,62]] as const;
-    for(const [x,y] of crates){
-      g.fillStyle(0x694526,1).fillRect(x,y,28,25);
-      g.lineStyle(2,0xb57d42,1).strokeRect(x,y,28,25);
-      g.lineBetween(x,y,x+28,y+25); g.lineBetween(x+28,y,x,y+25);
-    }
-    const barrels=[[-134,9],[142,8],[-78,111]] as const;
-    for(const [x,y] of barrels){
-      g.fillStyle(0x5d3a22,1).fillEllipse(x,y,27,34);
-      g.lineStyle(3,0xc18a4e,0.9).strokeEllipse(x,y,27,34);
-      g.lineBetween(x-12,y,x+12,y);
-    }
-    for(const [x,y] of [[-145,-55],[158,-35],[91,92]] as const){
-      g.fillStyle(0xffc65d,0.12).fillCircle(x,y,34);
-      g.fillStyle(0xffd87d,1).fillCircle(x,y,5);
-      g.lineStyle(2,0x5a351d,1).strokeRect(x-6,y-9,12,18);
-    }
-
-    const title = this.add.text(0, -178, 'WAYWARD GULL', {
-      fontFamily: 'Georgia, serif', fontSize: '15px', fontStyle: 'bold',
-      color: '#f7e8c3', backgroundColor: '#071116d9', padding: { x: 12, y: 6 },
-    }).setOrigin(0.5);
-
-    this.deckPlayer = this.add.image(this.deckPlayerLocal.x, this.deckPlayerLocal.y, 'alexander').setScale(0.58).setDepth(8);
-    deck.add([g,title,this.deckPlayer]);
+    this.deckPlayer = this.add.image(this.deckPlayerLocal.x, this.deckPlayerLocal.y, 'alexander')
+      .setScale(0.68).setDepth(12);
+    deck.add([art, vignette, this.deckPlayer]);
     this.deckCrew.clear();
 
-    const save=SaveManager.get(); let slot=0;
-    for(const member of save.crew){
-      const atHelm=member.capabilities.includes('helm')&&member.id==='sera';
-      const spots=[[-104,24],[-28,-10],[82,46],[-74,88],[120,12]] as const;
-      const p=atHelm ? [96,-78] as const : spots[slot++%spots.length]!;
+    const save = SaveManager.get();
+    let slot = 0;
+    const crewSpots = [[-118,20],[-45,-45],[108,52],[-96,105],[72,112]] as const;
+    for (const member of save.crew) {
+      const atHelm = member.capabilities.includes('helm') && member.id === 'sera';
+      const p = atHelm ? [90,-155] as const : crewSpots[slot++ % crewSpots.length]!;
       const x=p[0], y=p[1];
       const sprite=this.add.image(x,y,this.crewTexture(member.id,member.visualArchetype,member.role))
-        .setScale(member.id==='rowan'?0.56:0.52).setDepth(7);
-      const label=this.add.text(x,y-41,atHelm?member.name.split(' ')[0]+' · HELM':member.name.split(' ')[0]??member.name,{
-        fontFamily:'Georgia, serif',fontSize:'9px',fontStyle:'bold',color:member.capabilities.includes('navigation')?'#d9f1ff':'#f7e5c8',
-        backgroundColor:'#120b08cc',padding:{x:5,y:2},
-      }).setOrigin(0.5);
+        .setScale(member.id==='rowan'?0.64:0.60).setDepth(11);
+      const label=this.add.text(x,y-48,atHelm?member.name.split(' ')[0]+' · HELM':member.name.split(' ')[0]??member.name,{
+        fontFamily:'Georgia, serif',fontSize:'10px',fontStyle:'bold',color:'#f7e5c8',
+        backgroundColor:'#0d0907d9',padding:{x:6,y:3},
+      }).setOrigin(0.5).setDepth(13);
       if(member.hp<=0){sprite.setTint(0x555b5f).setAlpha(0.7).setAngle(90);label.setText(member.name.split(' ')[0]+' · DOWN').setColor('#ffd3ca');}
       this.deckCrew.set(member.id,{sprite,label,x,y}); deck.add([sprite,label]);
     }
@@ -1525,7 +1466,7 @@ export class SeaScene extends Phaser.Scene {
     if (this.navigationMode !== 'sera' || this.boardingActive) return null;
     if (this.shipArea === 'deck') {
       if (!this.deck?.visible) return null;
-      if (this.deckPlayerLocal.y >= 105) return { label: 'Go below deck', run: () => this.enterShipInterior() };
+      if (this.deckPlayerLocal.y >= 155) return { label: 'Go below deck', run: () => this.enterShipInterior() };
       return null;
     }
 
@@ -1560,7 +1501,7 @@ export class SeaScene extends Phaser.Scene {
     this.shipArea = 'deck';
     this.interior?.setVisible(false);
     this.deck?.setVisible(true);
-    this.deckPlayerLocal.set(0, 108);
+    this.deckPlayerLocal.set(0, 160);
     this.deckPlayer?.setPosition(0, 88);
     this.toast.show('You climb back onto the main deck.', 1800);
   }

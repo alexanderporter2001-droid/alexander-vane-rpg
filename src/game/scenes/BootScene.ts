@@ -22,6 +22,7 @@ export class BootScene extends Phaser.Scene {
     this.makeCharacter('npc-dockhand', 0x9f6e4f, 0x40515a, 0x7c8c93, 'dockhand');
     this.makeCharacter('npc-sailor', 0xc28b67, 0x5b4635, 0x3c6d83, 'sailor');
     this.makeShip();
+    this.makeDeckArt();
     this.makeProp('crate', 0x74512f, 44, 44);
     this.makeProp('barrel', 0x805b31, 38, 44);
 
@@ -125,4 +126,101 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture(key, width, height);
     g.destroy();
   }
+  private makeDeckArt(): void {
+    const g = this.add.graphics();
+    const W = 720, H = 900;
+
+    // Transparent prerendered shipboard art. This becomes a texture rather than
+    // dozens of live primitive objects, giving the deck a denser illustrated look.
+    g.fillStyle(0x120b08, 0.55).fillEllipse(W/2, H/2 + 55, 610, 770);
+    g.fillStyle(0x352016, 1);
+    g.fillPoints([
+      new Phaser.Geom.Point(105,120), new Phaser.Geom.Point(560,70),
+      new Phaser.Geom.Point(650,650), new Phaser.Geom.Point(180,790)
+    ], true);
+    g.lineStyle(18,0x1b100b,1).strokePoints([
+      new Phaser.Geom.Point(105,120), new Phaser.Geom.Point(560,70),
+      new Phaser.Geom.Point(650,650), new Phaser.Geom.Point(180,790)
+    ], true);
+    g.fillStyle(0x8b5b30,1).fillPoints([
+      new Phaser.Geom.Point(128,140), new Phaser.Geom.Point(540,94),
+      new Phaser.Geom.Point(620,630), new Phaser.Geom.Point(196,758)
+    ],true);
+
+    // plank texture and highlights
+    g.lineStyle(5,0x4c2d1a,0.78);
+    for(let y=150;y<720;y+=35) g.lineBetween(145,y,598,y-65);
+    g.lineStyle(2,0xd49a57,0.35);
+    for(let x=170;x<580;x+=55) g.lineBetween(x,125,x+82,705);
+
+    // raised quarterdeck
+    g.fillStyle(0x56331d,1).fillPoints([
+      new Phaser.Geom.Point(350,110),new Phaser.Geom.Point(545,88),
+      new Phaser.Geom.Point(575,270),new Phaser.Geom.Point(378,292)
+    ],true);
+    g.lineStyle(8,0xc28b4e,1).strokePoints([
+      new Phaser.Geom.Point(350,110),new Phaser.Geom.Point(545,88),
+      new Phaser.Geom.Point(575,270),new Phaser.Geom.Point(378,292)
+    ],true);
+
+    // rails with repeated posts
+    g.lineStyle(10,0x3a2114,1);
+    g.lineBetween(122,145,190,748); g.lineBetween(542,100,618,624);
+    g.lineStyle(5,0xd2a15e,1);
+    g.lineBetween(128,145,196,742); g.lineBetween(536,103,611,622);
+    for(let y=180;y<700;y+=58){
+      g.fillStyle(0x6c4225,1).fillRoundedRect(130+(y-180)*0.11,y,15,35,5);
+      g.fillStyle(0xd0a064,1).fillCircle(137+(y-180)*0.11,y,7);
+    }
+
+    // masts with iron bands
+    for(const [x,y,h] of [[270,115,520],[440,125,350]] as const){
+      g.fillStyle(0x342015,1).fillRoundedRect(x-22,y,44,h,15);
+      g.fillStyle(0x9d6938,1).fillRoundedRect(x-12,y,24,h,10);
+      g.fillStyle(0x242126,1);
+      for(let by=y+70;by<y+h;by+=115) g.fillRect(x-23,by,46,16);
+    }
+
+    // rope rigging
+    g.lineStyle(5,0xd2a66a,0.95);
+    g.lineBetween(270,150,150,305); g.lineBetween(270,175,585,205);
+    g.lineBetween(440,165,600,370); g.lineBetween(270,260,185,650);
+    g.lineStyle(2,0x6f4c2e,0.9);
+    for(let y=240;y<560;y+=38) g.lineBetween(166,y,250,y+8);
+
+    // central hatch / grating
+    g.fillStyle(0x21140e,1).fillRoundedRect(330,430,170,125,12);
+    g.lineStyle(7,0xc08a4d,1).strokeRoundedRect(330,430,170,125,12);
+    g.lineStyle(4,0x9b6a3c,1);
+    for(let y=450;y<545;y+=22) g.lineBetween(345,y,485,y);
+    for(let x=355;x<490;x+=28) g.lineBetween(x,444,x,542);
+
+    // helm wheel
+    g.fillStyle(0x24150e,1).fillCircle(474,205,42);
+    g.lineStyle(9,0xc58c4c,1).strokeCircle(474,205,42);
+    for(let a=0;a<Math.PI*2;a+=Math.PI/6)
+      g.lineBetween(474+Math.cos(a)*24,205+Math.sin(a)*24,474+Math.cos(a)*58,205+Math.sin(a)*58);
+
+    // crates, barrels, coils and lanterns
+    const crates=[[185,455],[205,515],[515,390],[530,455]] as const;
+    for(const [x,y] of crates){
+      g.fillStyle(0x704725,1).fillRoundedRect(x,y,58,52,4);
+      g.lineStyle(4,0xc08a4a,1).strokeRoundedRect(x,y,58,52,4);
+      g.lineBetween(x,y,x+58,y+52); g.lineBetween(x+58,y,x,y+52);
+    }
+    for(const [x,y] of [[180,350],[555,330],[265,650]] as const){
+      g.fillStyle(0x56351f,1).fillEllipse(x,y,54,68);
+      g.lineStyle(5,0xc08b4d,1).strokeEllipse(x,y,54,68);
+      g.lineBetween(x-24,y,x+24,y);
+    }
+    for(const [x,y] of [[165,270],[575,270],[520,610]] as const){
+      g.fillStyle(0xffbd4d,0.12).fillCircle(x,y,62);
+      g.fillStyle(0xffd678,1).fillCircle(x,y,10);
+      g.lineStyle(4,0x4c2c19,1).strokeRoundedRect(x-12,y-19,24,38,4);
+    }
+
+    g.generateTexture('wayward-deck-art', W, H);
+    g.destroy();
+  }
+
 }
