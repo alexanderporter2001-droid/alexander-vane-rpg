@@ -1179,7 +1179,7 @@ export class GullrockScene extends Phaser.Scene {
   private drawPort(): void {
     addProductionGround(this,this.worldW,this.worldH,0x47554c4c,'tropical',-21);
     addProductionClutter(this,0x47554c4c,[[280,350],[410,670],[600,610],[720,470],[900,575],[1040,690],[1180,350],[1260,520]],17);
-    const g = this.add.graphics();
+    const g = this.add.graphics().setAlpha(.78);
 
     // Water and shoreline
     g.fillStyle(0x123d50, 1).fillRect(0, 0, this.worldW, this.worldH);
