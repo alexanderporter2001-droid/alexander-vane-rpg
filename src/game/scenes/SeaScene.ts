@@ -668,7 +668,8 @@ export class SeaScene extends Phaser.Scene {
 
   private createShipInterior(): void {
     const interior=this.add.container(this.ship.x,this.ship.y).setDepth(315).setVisible(false).setScrollFactor(0);
-    const art=createInteriorArt(this); interior.add(art);
+    const material=this.add.container(0,0).setDepth(-2); for(let y=-224;y<=224;y+=64)for(let x=-160;x<=160;x+=64)material.add(this.add.image(x,y,'kenney-pirate-tiles',33).setAlpha(.42)); interior.add(material);
+    const art=createInteriorArt(this); art.setAlpha(.84); interior.add(art);
     const labels=[
       [-100,-190,'CAPTAIN'],[100,-190,'SERA'],[-100,-52,'ROWAN'],
       [100,-52,'GALLEY'],[-100,79,'BERTHS'],[100,79,'CARGO'],[0,197,'MAIN DECK']
