@@ -72,7 +72,7 @@ export function createDeckArt(scene:Phaser.Scene):Phaser.GameObjects.Container{
   // Helm station: deck pedestal, wheel, compass binnacle.
   const helm=scene.add.graphics().setDepth(12);helm.fillStyle(0x4a2b18,1).fillPoints([new Phaser.Geom.Point(63,-182),new Phaser.Geom.Point(128,-188),new Phaser.Geom.Point(137,-119),new Phaser.Geom.Point(69,-112)],true);
   helm.fillStyle(0x1d110b,1).fillCircle(100,-166,26);helm.lineStyle(5,0xb97c3f,1).strokeCircle(100,-166,26);for(let a=0;a<Math.PI*2;a+=Math.PI/8)helm.lineBetween(100+Math.cos(a)*15,-166+Math.sin(a)*15,100+Math.cos(a)*36,-166+Math.sin(a)*36);
-  helm.fillStyle(0x684426,1).fillRoundedRect(76,-132,34,24,5);helm.fillStyle(0xd4b568,1).fillCircle(93,-121,7);helm.lineStyle(1,0x443526,1).strokeCircle(93,-121,7);root.add(helm);
+  helm.fillStyle(0x684426,1).fillRoundedRect(76,-132,34,24,5);helm.fillStyle(0xd4b568,1).fillCircle(93,-121,7);helm.lineStyle(1,0x443526,1).strokeCircle(93,-121,7);helm.setVisible(!scene.textures.exists('prod-helm-hires'));root.add(helm);if(scene.textures.exists('prod-helm-hires'))root.add(scene.add.image(101,-158,'prod-helm-hires').setDisplaySize(72,72).setDepth(12));
 
   // Dimensional props.
   for(const [x,y,s] of [[-132,8,.82],[-117,54,.9],[136,27,.78],[145,67,.75]] as const)root.add(crate(scene,x,y,s).setDepth(11));
