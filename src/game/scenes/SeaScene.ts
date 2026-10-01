@@ -606,7 +606,7 @@ export class SeaScene extends Phaser.Scene {
   }
 
   private createShipboardSea(): void {
-    const sea=this.add.tileSprite(0,0,this.scale.width,this.scale.height,'shipboard-water').setOrigin(0).setScrollFactor(0).setDepth(295).setVisible(false);
+    const sea=this.add.tileSprite(0,0,this.scale.width,this.scale.height,this.textures.exists('prod-ocean-base')?'prod-ocean-base':'shipboard-water').setOrigin(0).setScrollFactor(0).setDepth(295).setVisible(false);
     const foam=this.add.graphics().setScrollFactor(0).setDepth(296).setVisible(false);
     this.shipboardSea=sea; this.shipboardFoam=foam;
     const redraw=()=>{sea.setSize(this.scale.width,this.scale.height);};
@@ -623,14 +623,16 @@ export class SeaScene extends Phaser.Scene {
     this.shipboardSea.tilePositionY-=22*dt*motion;
     this.shipboardSea.tilePositionX+=7*dt*motion;
     const f=this.shipboardFoam; f.clear(); const t=this.time.now*.025;
-    f.lineStyle(2,0xc8eef0,.22);for(let i=0;i<9;i++){const y=(t+i*71)%this.scale.height;const x=(i*97)%Math.max(120,this.scale.width-90);f.beginPath();f.moveTo(x,y).lineTo(x+28,y-8).lineTo(x+62,y+9).lineTo(x+103,y-2).strokePath();}
+    f.lineStyle(2,0xc8eef0,.28);for(let i=0;i<9;i++){const y=(t+i*71)%this.scale.height;const x=(i*97)%Math.max(120,this.scale.width-90);f.beginPath();f.moveTo(x,y).lineTo(x+28,y-8).lineTo(x+62,y+9).lineTo(x+103,y-2).strokePath();}
     // broad wake travels downward behind the screen-stable hull.
     f.lineStyle(5,0xe7f6f2,.20);const cx=this.scale.width/2;for(let i=0;i<4;i++){const yy=this.scale.height*.66+i*34;f.beginPath().moveTo(cx-46-i*13,yy).lineTo(cx-80-i*15,yy+18).lineTo(cx-95-i*20,yy+35).lineTo(cx-118-i*25,yy+50).strokePath();f.beginPath().moveTo(cx+46+i*13,yy).lineTo(cx+80+i*15,yy+18).lineTo(cx+95+i*20,yy+35).lineTo(cx+118+i*25,yy+50).strokePath();}
   }
 
   private createDeckView(): void {
     const deck=this.add.container(this.ship.x,this.ship.y).setDepth(310).setScrollFactor(0);
-    const art=createDeckArt(this); this.deckArt=art; deck.add(art);
+    const hullShadow=this.add.ellipse(0,18,390,565,0x020609,.32).setDepth(-3); deck.add(hullShadow);
+    const hull=this.add.image(0,8,this.textures.exists('prod-wayward-gull')?'prod-wayward-gull':'wayward-gull').setDisplaySize(300,570).setDepth(-2); deck.add(hull);
+    const art=createDeckArt(this); art.setScale(.70); this.deckArt=art; deck.add(art);
     const shadow=this.add.ellipse(this.deckPlayerLocal.x,this.deckPlayerLocal.y+25,34,11,0x050607,.32).setDepth(9);
     this.deckPlayer=this.add.image(this.deckPlayerLocal.x,this.deckPlayerLocal.y,'prod-alexander').setScale(1.05).setDepth(12);
     this.deckPlayer.setData('shadow',shadow); deck.add([shadow,this.deckPlayer]);
