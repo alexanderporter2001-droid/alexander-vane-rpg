@@ -415,11 +415,12 @@ export class SeaScene extends Phaser.Scene {
   private applyHeroMotionTexture(sprite:Phaser.GameObjects.Image,move:Phaser.Math.Vector2):void{
     if(move.lengthSq()>.025&&this.time.now>=this.heroAnimAt){this.heroWalkFrame=1-this.heroWalkFrame;this.heroAnimAt=this.time.now+170;}
     if(move.lengthSq()<=.025)this.heroWalkFrame=0;
+    if(sprite===this.deckPlayer||sprite===this.interiorPlayer){ sprite.setTexture('prod-alexander'); sprite.setFlipX(this.heroFacing==='left'); return; }
     sprite.setTexture(heroTexture('alexander',this.heroFacing,this.heroWalkFrame));
   }
 
   private updateHeroAnimation():void{
-    const bob=Math.sin(this.time.now*.0024)*.45;
+    const bob=0;
     if(this.navigationMode==='sera'){
       const sera=this.deckCrew.get('sera');if(sera?.sprite.visible){sera.sprite.setTexture(heroTexture('sera','down',Math.floor(this.time.now/850)%2));sera.sprite.setAngle(Math.sin(this.time.now*.0016)*.7);}
       const rowan=this.rowanArea==='deck'?this.deckCrew.get('rowan'):this.interiorCrew.get('rowan');if(rowan?.sprite.visible){const dx=this.rowanTarget.x-rowan.x,dy=this.rowanTarget.y-rowan.y;const facing=facingFromMotion(dx,dy,'down');rowan.sprite.setTexture(heroTexture('rowan',facing,(Math.abs(dx)+Math.abs(dy)>5)?Math.floor(this.time.now/210)%2:0));}
@@ -552,7 +553,7 @@ export class SeaScene extends Phaser.Scene {
     } else if (delegated) {
       this.cameras.main.stopFollow();
       this.cameras.main.setScroll(0, 0);
-      this.cameras.main.setZoom(this.scale.width < 700 ? 1.55 : 1.42);
+      this.cameras.main.setZoom(this.scale.width < 700 ? 0.92 : 1.02);
       this.centerShipboardView();
       this.mobile?.setOrderLabel('TAKE HELM');
       if (showToast) this.toast.show('Sera has the course. Move freely around the deck.', 2300);
@@ -631,7 +632,7 @@ export class SeaScene extends Phaser.Scene {
     const deck=this.add.container(this.ship.x,this.ship.y).setDepth(310).setScrollFactor(0);
     const art=createDeckArt(this); this.deckArt=art; deck.add(art);
     const shadow=this.add.ellipse(this.deckPlayerLocal.x,this.deckPlayerLocal.y+25,34,11,0x050607,.32).setDepth(9);
-    this.deckPlayer=this.add.image(this.deckPlayerLocal.x,this.deckPlayerLocal.y,heroTexture('alexander','down',0)).setScale(.43).setDepth(12);
+    this.deckPlayer=this.add.image(this.deckPlayerLocal.x,this.deckPlayerLocal.y,'prod-alexander').setScale(1.05).setDepth(12);
     this.deckPlayer.setData('shadow',shadow); deck.add([shadow,this.deckPlayer]);
     this.deckCrew.clear();
     const save=SaveManager.get();let slot=0;const crewSpots=[[-118,20],[-42,-42],[108,48],[-90,112],[72,112]] as const;
@@ -672,7 +673,7 @@ export class SeaScene extends Phaser.Scene {
     ] as const;
     const texts=labels.map(([x,y,label])=>this.add.text(x,y,label,{fontFamily:'Georgia, serif',fontSize:'8px',fontStyle:'bold',color:'#e9d3ad',backgroundColor:'#100b087d',padding:{x:4,y:2}}).setOrigin(.5).setDepth(12));
     const shadow=this.add.ellipse(this.interiorPlayerLocal.x,this.interiorPlayerLocal.y+23,32,10,0x050607,.3).setDepth(8);
-    this.interiorPlayer=this.add.image(this.interiorPlayerLocal.x,this.interiorPlayerLocal.y,heroTexture('alexander','down',0)).setScale(.38).setDepth(10);
+    this.interiorPlayer=this.add.image(this.interiorPlayerLocal.x,this.interiorPlayerLocal.y,'prod-alexander').setScale(.92).setDepth(10);
     this.interiorPlayer.setData('shadow',shadow);interior.add([...texts,shadow,this.interiorPlayer]);this.interiorCrew.clear();
     const save=SaveManager.get(),minute=save.world.minuteOfDay,isNight=minute>=21*60||minute<6*60;
     const positions=new Map<string,{x:number;y:number}>();positions.set('rowan',{x:-100,y:isNight?-124:-8});if(this.navigationMode!=='sera')positions.set('sera',{x:98,y:-132});
