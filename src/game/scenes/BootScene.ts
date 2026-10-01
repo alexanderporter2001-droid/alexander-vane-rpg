@@ -39,6 +39,7 @@ export class BootScene extends Phaser.Scene {
     this.makeCharacter('npc-dockhand', 0x9f6e4f, 0x40515a, 0x7c8c93, 'dockhand');
     this.makeCharacter('npc-sailor', 0xc28b67, 0x5b4635, 0x3c6d83, 'sailor');
     this.makeShip();
+    this.makeProductionAliases();
     this.makeWaterTexture();
     this.makeDeckArt();
     this.makeProp('crate', 0x74512f, 44, 44);
@@ -139,6 +140,15 @@ export class BootScene extends Phaser.Scene {
 
     g.generateTexture(key, 72, 104);
     g.destroy();
+  }
+
+  private makeProductionAliases(): void {
+    // Runtime aliases keep legacy gameplay code safe while production art is primary.
+    if (this.textures.exists('prod-wayward-gull')) this.textures.renameTexture('wayward-gull', 'legacy-wayward-gull');
+    if (this.textures.exists('prod-wayward-gull') && !this.textures.exists('wayward-gull')) {
+      const src=this.textures.get('prod-wayward-gull').getSourceImage() as HTMLImageElement;
+      this.textures.addImage('wayward-gull',src);
+    }
   }
 
   private makeShip(): void {
