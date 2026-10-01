@@ -6,6 +6,8 @@ export class BootScene extends Phaser.Scene {
 
   preload(): void {
     this.load.image('prod-alexander', 'assets/production/alexander.png');
+    this.load.image('prod-sera', 'assets/production/characters/sera.webp');
+    this.load.image('prod-rowan', 'assets/production/characters/rowan.webp');
     this.load.image('kenney-pirate-tiles', 'assets/licensed/kenney-pirate/tiles_sheet.png');
     this.load.image('kenney-pirate-ships', 'assets/licensed/kenney-pirate/shipsMiscellaneous_sheet.png');
     this.load.spritesheet('scallywag-blue', 'assets/licensed/scallywag-pirates/pirates-blue.png', { frameWidth: 16, frameHeight: 16 });
