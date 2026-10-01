@@ -4,6 +4,11 @@ import { createHeroTextures } from '../visual/PirateCharacters';
 export class BootScene extends Phaser.Scene {
   constructor() { super('BootScene'); }
 
+  preload(): void {
+    this.load.image('prod-alexander', 'assets/production/alexander.png');
+    this.load.image('kenney-pirate-tiles', 'assets/licensed/kenney-pirate/tiles_sheet.png');
+  }
+
   create(): void {
     this.makeTextures();
     this.scene.start('TitleScene');
