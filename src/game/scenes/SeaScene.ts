@@ -11,6 +11,7 @@ import { advanceWorldClock, advanceWorldMinutes } from '../systems/WorldClock';
 import { createEncounter, ensureKnownGroup } from '../systems/LivingWorld';
 import { crewCombatStats, fruitStats, playerCombatStats, recordCombatExperience, recordCrewExperience, recordFruitUse } from '../systems/Progression';
 import { createDeckArt, createInteriorArt, timeOfDayTint } from '../visual/ShipArt';
+import { facingFromMotion, heroTexture, type Facing } from '../visual/PirateCharacters';
 
 interface BoarderUnit {
   id: string;
@@ -105,6 +106,9 @@ export class SeaScene extends Phaser.Scene {
   private shipboardSea?: Phaser.GameObjects.TileSprite;
   private shipboardFoam?: Phaser.GameObjects.Graphics;
   private deckArt?: Phaser.GameObjects.Container;
+  private heroFacing: Facing = 'down';
+  private heroWalkFrame = 0;
+  private heroAnimAt = 0;
   private shipArea: 'deck' | 'below' = 'deck';
   private interior?: Phaser.GameObjects.Container;
   private interiorPlayer?: Phaser.GameObjects.Image;
@@ -254,6 +258,7 @@ export class SeaScene extends Phaser.Scene {
 
     this.applyShipVelocity(dt);
     this.updateCrewShipRoutine(dt);
+    this.updateHeroAnimation();
     if (this.navigationMode !== 'sera') this.syncDeckToShip();
     this.updateShipboardAtmosphere(dt);
     this.updateSeaEncounter(dt);
@@ -317,6 +322,7 @@ export class SeaScene extends Phaser.Scene {
 
   private updateManualShip(dt: number): void {
     const move = this.getMoveInput();
+    this.heroFacing=facingFromMotion(move.x,move.y,this.heroFacing);
     const turn = move.x;
     const throttle = -move.y;
 
@@ -391,6 +397,7 @@ export class SeaScene extends Phaser.Scene {
       this.interiorPlayerLocal.x = Phaser.Math.Clamp(this.interiorPlayerLocal.x + move.x * 118 * dt, -158, 158);
       this.interiorPlayerLocal.y = Phaser.Math.Clamp(this.interiorPlayerLocal.y + move.y * 118 * dt, -198, 198);
       this.interiorPlayer.setPosition(this.interiorPlayerLocal.x, this.interiorPlayerLocal.y);
+      this.applyHeroMotionTexture(this.interiorPlayer,move);
       (this.interiorPlayer.getData('shadow') as Phaser.GameObjects.Ellipse | undefined)?.setPosition(this.interiorPlayerLocal.x,this.interiorPlayerLocal.y+23);
       return;
     }
@@ -399,8 +406,31 @@ export class SeaScene extends Phaser.Scene {
     this.deckPlayerLocal.y = Phaser.Math.Clamp(this.deckPlayerLocal.y + move.y * 118 * dt, -190, 185);
     const taper = this.deckPlayerLocal.y < -125 ? 125 : 170;
     this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x, -taper, taper);
+    this.resolveDeckObstacles();
     this.deckPlayer.setPosition(this.deckPlayerLocal.x, this.deckPlayerLocal.y);
+    this.applyHeroMotionTexture(this.deckPlayer,move);
     (this.deckPlayer.getData('shadow') as Phaser.GameObjects.Ellipse | undefined)?.setPosition(this.deckPlayerLocal.x,this.deckPlayerLocal.y+25);
+  }
+
+  private applyHeroMotionTexture(sprite:Phaser.GameObjects.Image,move:Phaser.Math.Vector2):void{
+    if(move.lengthSq()>.025&&this.time.now>=this.heroAnimAt){this.heroWalkFrame=1-this.heroWalkFrame;this.heroAnimAt=this.time.now+170;}
+    if(move.lengthSq()<=.025)this.heroWalkFrame=0;
+    sprite.setTexture(heroTexture('alexander',this.heroFacing,this.heroWalkFrame));
+  }
+
+  private updateHeroAnimation():void{
+    const bob=Math.sin(this.time.now*.0024)*.45;
+    if(this.navigationMode==='sera'){
+      const sera=this.deckCrew.get('sera');if(sera?.sprite.visible){sera.sprite.setTexture(heroTexture('sera','down',Math.floor(this.time.now/850)%2));sera.sprite.setAngle(Math.sin(this.time.now*.0016)*.7);}
+      const rowan=this.rowanArea==='deck'?this.deckCrew.get('rowan'):this.interiorCrew.get('rowan');if(rowan?.sprite.visible){const dx=this.rowanTarget.x-rowan.x,dy=this.rowanTarget.y-rowan.y;const facing=facingFromMotion(dx,dy,'down');rowan.sprite.setTexture(heroTexture('rowan',facing,(Math.abs(dx)+Math.abs(dy)>5)?Math.floor(this.time.now/210)%2:0));}
+    }
+    this.deckPlayer?.setAngle(bob);
+  }
+
+  private resolveDeckObstacles():void{
+    // soft exclusion zones around mast feet, helm and cargo. Push to nearest edge.
+    const zones=[{x:-66,y:-25,r:24},{x:76,y:-78,r:22},{x:100,y:-151,r:42},{x:-128,y:34,r:34},{x:140,y:45,r:31}];
+    for(const z of zones){const dx=this.deckPlayerLocal.x-z.x,dy=this.deckPlayerLocal.y-z.y;const d=Math.hypot(dx,dy);if(d<z.r){const n=Math.max(.001,d);this.deckPlayerLocal.x=z.x+dx/n*z.r;this.deckPlayerLocal.y=z.y+dy/n*z.r;}}
   }
 
   private updateCrewShipRoutine(dt: number): void {
@@ -415,7 +445,7 @@ export class SeaScene extends Phaser.Scene {
       // place to spend time without following Alexander between areas.
       const phase = Math.floor(SaveManager.get().world.minuteOfDay / 45) + Math.floor(now / 15000);
       if (phase % 4 === 0) this.rowanArea = this.rowanArea === 'deck' ? 'below' : 'deck';
-      const deckSpots = [[-42, 20], [44, 42], [-30, -34], [38, -18]] as const;
+      const deckSpots = [[-112, -92], [15, 152], [118, 112], [-122, 105], [15,-55]] as const;
       const belowSpots = [[-92, 28], [-92, -108], [88, 18], [-108, 126], [76, 126]] as const;
       const spots = this.rowanArea === 'deck' ? deckSpots : belowSpots;
       const pick = spots[Math.abs(phase) % spots.length]!;
@@ -516,7 +546,7 @@ export class SeaScene extends Phaser.Scene {
       else this.interior?.setVisible(true);
       this.cameras.main.stopFollow();
       this.cameras.main.setScroll(0, 0);
-      this.cameras.main.setZoom(this.scale.width < 700 ? 1.18 : 1.22);
+      this.cameras.main.setZoom(this.scale.width < 700 ? 0.86 : 1.02);
       this.centerShipboardView();
       this.mobile?.setOrderLabel('TAKE HELM');
     } else if (delegated) {
@@ -591,25 +621,26 @@ export class SeaScene extends Phaser.Scene {
     const motion=Math.max(0.15,Math.abs(this.speed)/12);
     this.shipboardSea.tilePositionY-=22*dt*motion;
     this.shipboardSea.tilePositionX+=7*dt*motion;
-    const f=this.shipboardFoam; f.clear(); f.lineStyle(3,0xdaf2ef,.28);
-    const t=this.time.now*.025;
-    for(let i=0;i<7;i++){const y=(t+i*83)%this.scale.height;f.beginPath();f.moveTo(0,y);f.lineTo(55,y-9);f.lineTo(118,y+1);f.strokePath();}
+    const f=this.shipboardFoam; f.clear(); const t=this.time.now*.025;
+    f.lineStyle(2,0xc8eef0,.22);for(let i=0;i<9;i++){const y=(t+i*71)%this.scale.height;const x=(i*97)%Math.max(120,this.scale.width-90);f.beginPath();f.moveTo(x,y).cubicBezierTo(x+28,y-8,x+62,y+9,x+103,y-2).strokePath();}
+    // broad wake travels downward behind the screen-stable hull.
+    f.lineStyle(5,0xe7f6f2,.20);const cx=this.scale.width/2;for(let i=0;i<4;i++){const yy=this.scale.height*.66+i*34;f.beginPath().moveTo(cx-46-i*13,yy).cubicBezierTo(cx-80-i*15,yy+18,cx-95-i*20,yy+35,cx-118-i*25,yy+50).strokePath();f.beginPath().moveTo(cx+46+i*13,yy).cubicBezierTo(cx+80+i*15,yy+18,cx+95+i*20,yy+35,cx+118+i*25,yy+50).strokePath();}
   }
 
   private createDeckView(): void {
     const deck=this.add.container(this.ship.x,this.ship.y).setDepth(310).setScrollFactor(0);
     const art=createDeckArt(this); this.deckArt=art; deck.add(art);
     const shadow=this.add.ellipse(this.deckPlayerLocal.x,this.deckPlayerLocal.y+25,34,11,0x050607,.32).setDepth(9);
-    this.deckPlayer=this.add.image(this.deckPlayerLocal.x,this.deckPlayerLocal.y,'alexander').setScale(.47).setDepth(12);
+    this.deckPlayer=this.add.image(this.deckPlayerLocal.x,this.deckPlayerLocal.y,heroTexture('alexander','down',0)).setScale(.43).setDepth(12);
     this.deckPlayer.setData('shadow',shadow); deck.add([shadow,this.deckPlayer]);
     this.deckCrew.clear();
     const save=SaveManager.get();let slot=0;const crewSpots=[[-118,20],[-42,-42],[108,48],[-90,112],[72,112]] as const;
     for (const member of save.crew) {
       const atHelm=member.capabilities.includes('helm')&&member.id==='sera';
       const p=atHelm?[98,-154] as const:crewSpots[slot++%crewSpots.length]!;
-      const sprite=this.add.image(p[0],p[1],this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(member.id==='rowan'?.47:.44).setDepth(12);
+      const sprite=this.add.image(p[0],p[1],member.id==='sera'?heroTexture('sera','down',0):member.id==='rowan'?heroTexture('rowan','down',0):this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(member.id==='rowan'?.47:.44).setDepth(12);
       const contact=this.add.ellipse(p[0],p[1]+24,32,10,0x050607,.3).setDepth(9);
-      const label=this.add.text(p[0],p[1]-42,atHelm?'Sera · helm':member.name.split(' ')[0]??member.name,{fontFamily:'Georgia, serif',fontSize:'8px',fontStyle:'bold',color:'#f4e4c5',backgroundColor:'#0b09079c',padding:{x:4,y:2}}).setOrigin(.5).setDepth(14);
+      const label=this.add.text(p[0],p[1]-42,atHelm?'Sera · helm':member.name.split(' ')[0]??member.name,{fontFamily:'Georgia, serif',fontSize:'6px',fontStyle:'bold',color:'#f4e4c5',backgroundColor:'#0b09079c',padding:{x:4,y:2}}).setOrigin(.5).setDepth(14);
       sprite.setData('shadow',contact);
       if(member.hp<=0){sprite.setTint(0x555b5f).setAlpha(.7).setAngle(90);label.setText((member.name.split(' ')[0]??member.name)+' · down');}
       this.deckCrew.set(member.id,{sprite,label,x:p[0],y:p[1]});deck.add([contact,sprite,label]);
@@ -641,7 +672,7 @@ export class SeaScene extends Phaser.Scene {
     ] as const;
     const texts=labels.map(([x,y,label])=>this.add.text(x,y,label,{fontFamily:'Georgia, serif',fontSize:'8px',fontStyle:'bold',color:'#e9d3ad',backgroundColor:'#100b087d',padding:{x:4,y:2}}).setOrigin(.5).setDepth(12));
     const shadow=this.add.ellipse(this.interiorPlayerLocal.x,this.interiorPlayerLocal.y+23,32,10,0x050607,.3).setDepth(8);
-    this.interiorPlayer=this.add.image(this.interiorPlayerLocal.x,this.interiorPlayerLocal.y,'alexander').setScale(.42).setDepth(10);
+    this.interiorPlayer=this.add.image(this.interiorPlayerLocal.x,this.interiorPlayerLocal.y,heroTexture('alexander','down',0)).setScale(.38).setDepth(10);
     this.interiorPlayer.setData('shadow',shadow);interior.add([...texts,shadow,this.interiorPlayer]);this.interiorCrew.clear();
     const save=SaveManager.get(),minute=save.world.minuteOfDay,isNight=minute>=21*60||minute<6*60;
     const positions=new Map<string,{x:number;y:number}>();positions.set('rowan',{x:-100,y:isNight?-124:-8});if(this.navigationMode!=='sera')positions.set('sera',{x:98,y:-132});
@@ -650,7 +681,7 @@ export class SeaScene extends Phaser.Scene {
       if(member.id==='sera'&&this.navigationMode==='sera')continue;
       const p=positions.get(member.id)??{x:-128+(berth%3)*52,y:125+Math.floor(berth/3)*30};if(!positions.has(member.id))berth++;
       const contact=this.add.ellipse(p.x,p.y+21,28,9,0x050607,.3).setDepth(8);
-      const sprite=this.add.image(p.x,p.y,this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(.38).setDepth(10);
+      const sprite=this.add.image(p.x,p.y,member.id==='sera'?heroTexture('sera','down',0):member.id==='rowan'?heroTexture('rowan','down',0):this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(.36).setDepth(10);
       const label=this.add.text(p.x,p.y-34,member.name.split(' ')[0]??member.name,{fontFamily:'Georgia, serif',fontSize:'7px',fontStyle:'bold',color:'#f0dfc4',backgroundColor:'#100b087d',padding:{x:3,y:1}}).setOrigin(.5).setDepth(12);
       sprite.setData('shadow',contact);interior.add([contact,sprite,label]);this.interiorCrew.set(member.id,{sprite,label,x:p.x,y:p.y});
     }
@@ -828,7 +859,7 @@ export class SeaScene extends Phaser.Scene {
               this.navTarget = port;
               this.arrivalReady = false;
               this.arrivalNotifiedPortId = null;
-              if (this.navigationMode === 'sera' && this.speed < 35) this.speed = 52;
+              if (this.navigationMode === 'sera' && this.speed < 8) this.speed = 8;
               this.applyNavigationPresentation(false);
             }
           }
@@ -955,7 +986,7 @@ export class SeaScene extends Phaser.Scene {
     this.ship.setVisible(false);
     this.deck.setVisible(true);
     this.cameras.main.startFollow(this.ship, true, 1, 1);
-    this.cameras.main.setZoom(this.scale.width < 700 ? 1.18 : 1.22);
+    this.cameras.main.setZoom(this.scale.width < 700 ? 0.86 : 1.02);
     this.mobile?.setCombatVisible(true);
     this.mobile?.setInteract(null);
     this.crewHud.setVisible(true);
@@ -1586,6 +1617,9 @@ export class SeaScene extends Phaser.Scene {
     this.nightShade.setFillStyle(mood.shade,1).setAlpha(mood.alpha);
     const lamps=this.deckArt?.getData('lamps') as Phaser.GameObjects.Container | undefined;
     lamps?.setAlpha(mood.lampAlpha);
+    this.shipboardSea?.setTint(mood.waterTint);
+    const interiorLamps=this.interior?.getAt(0)?.getData?.('lamps') as Phaser.GameObjects.Container | undefined;
+    interiorLamps?.setAlpha(mood.lampAlpha);
   }
 
   private cardinal(angle: number): string {

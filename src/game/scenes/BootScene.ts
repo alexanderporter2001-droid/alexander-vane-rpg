@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { createHeroTextures } from '../visual/PirateCharacters';
 
 export class BootScene extends Phaser.Scene {
   constructor() { super('BootScene'); }
@@ -9,9 +10,9 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makeTextures(): void {
-    this.makeHeroCharacter('alexander', 0xd8b45f, 0x1d3445, 0x8e2430, 'captain');
-    this.makeHeroCharacter('sera', 0xc98e66, 0x315b72, 0xa13d52, 'navigator');
-    this.makeHeroCharacter('rowan', 0x9d6b4b, 0x2c3135, 0x9c3838, 'fighter');
+    createHeroTextures(this,'alexander','captain');
+    createHeroTextures(this,'sera','navigator');
+    createHeroTextures(this,'rowan','fighter');
     this.makeCharacter('crew-medic', 0xb98263, 0x49616d, 0xd7e1d0, 'medic');
     this.makeCharacter('crew-specialist', 0xa7775c, 0x4b5660, 0xb58b56, 'specialist');
     this.makeCharacter('marine', 0xd9b38c, 0xe6eef1, 0x315f8d, 'marine');
@@ -31,48 +32,6 @@ export class BootScene extends Phaser.Scene {
     bullet.fillStyle(0xffe3a2, 1).fillCircle(5, 5, 4);
     bullet.generateTexture('bullet', 10, 10);
     bullet.destroy();
-  }
-
-  private makeHeroCharacter(key: string, skin: number, cloth: number, accent: number, role: 'captain'|'navigator'|'fighter'): void {
-    const g=this.add.graphics();
-    // Soft painted shadow.
-    g.fillStyle(0x050607,0.32).fillEllipse(48,126,58,15);
-    // Boots and legs with asymmetry for a less icon-like silhouette.
-    g.fillStyle(0x17191c,1).fillRoundedRect(25,91,16,31,5).fillRoundedRect(54,89,16,34,5);
-    g.fillStyle(0x08090b,1).fillRoundedRect(20,116,24,9,4).fillRoundedRect(52,117,24,9,4);
-    // Coat/body.
-    g.fillStyle(cloth,1).fillPoints([new Phaser.Geom.Point(22,55),new Phaser.Geom.Point(72,52),new Phaser.Geom.Point(78,94),new Phaser.Geom.Point(18,96)],true);
-    g.fillStyle(0xf0e2ca,1).fillTriangle(38,55,57,54,48,77);
-    g.fillStyle(accent,1).fillRoundedRect(18,83,61,8,3);
-    // Arms and hands.
-    g.fillStyle(cloth,1).fillRoundedRect(11,59,16,37,7).fillRoundedRect(69,57,16,39,7);
-    g.fillStyle(skin,1).fillCircle(18,96,8).fillCircle(78,96,8);
-    // Neck/head.
-    g.fillStyle(skin,1).fillRoundedRect(42,42,12,16,4).fillEllipse(48,32,32,37);
-    // Hair, facial shadow and eyes.
-    const hair=role==='navigator'?0x7f332d:role==='fighter'?0xd7d4cc:0x17191d;
-    g.fillStyle(hair,1).fillEllipse(48,22,38,23);
-    if(role==='navigator') g.fillRoundedRect(27,22,9,39,4).fillRoundedRect(61,21,9,42,4);
-    if(role==='captain') {
-      g.fillTriangle(29,21,18,42,39,30).fillTriangle(67,20,78,41,57,29);
-      g.fillStyle(accent,1).fillTriangle(18,62,5,111,30,96).fillTriangle(78,61,91,111,66,96);
-      g.lineStyle(3,0xd8b45f,1).strokeLineShape(new Phaser.Geom.Line(22,88,74,88));
-    }
-    if(role==='fighter'){
-      g.fillTriangle(31,18,24,35,42,27).fillTriangle(64,18,72,35,54,27);
-      g.fillStyle(skin,1).fillRoundedRect(8,59,15,39,6).fillRoundedRect(73,59,15,39,6);
-      g.lineStyle(4,0xc5cbd0,1);
-      g.beginPath().moveTo(10,91).lineTo(1,108).lineTo(8,117).strokePath();
-      g.beginPath().moveTo(86,91).lineTo(95,108).lineTo(88,117).strokePath();
-    }
-    g.fillStyle(0x17191c,1).fillEllipse(42,33,4,3).fillEllipse(55,33,4,3);
-    g.lineStyle(2,0x5b3328,0.75).lineBetween(43,43,54,43);
-    // Small role details.
-    if(role==='navigator'){
-      g.fillStyle(0xd8b45f,1).fillCircle(78,73,8); g.fillStyle(0x172735,1).fillCircle(78,73,4);
-      g.fillStyle(accent,1).fillRoundedRect(25,84,47,7,3);
-    }
-    g.generateTexture(key,96,136); g.destroy();
   }
 
   private makeCharacter(key: string, skin: number, cloth: number, accent: number, role: string): void {
