@@ -1,0 +1,1 @@
+Production art pipeline enabled. Original production atlas is processed outside runtime; Phaser is responsible for composition, movement, collision, depth, lighting, and interaction rather than drawing the primary ship/hero artwork procedurally.
