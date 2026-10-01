@@ -622,9 +622,9 @@ export class SeaScene extends Phaser.Scene {
     this.shipboardSea.tilePositionY-=22*dt*motion;
     this.shipboardSea.tilePositionX+=7*dt*motion;
     const f=this.shipboardFoam; f.clear(); const t=this.time.now*.025;
-    f.lineStyle(2,0xc8eef0,.22);for(let i=0;i<9;i++){const y=(t+i*71)%this.scale.height;const x=(i*97)%Math.max(120,this.scale.width-90);f.beginPath();f.moveTo(x,y).cubicBezierTo(x+28,y-8,x+62,y+9,x+103,y-2).strokePath();}
+    f.lineStyle(2,0xc8eef0,.22);for(let i=0;i<9;i++){const y=(t+i*71)%this.scale.height;const x=(i*97)%Math.max(120,this.scale.width-90);f.beginPath();f.moveTo(x,y).lineTo(x+28,y-8).lineTo(x+62,y+9).lineTo(x+103,y-2).strokePath();}
     // broad wake travels downward behind the screen-stable hull.
-    f.lineStyle(5,0xe7f6f2,.20);const cx=this.scale.width/2;for(let i=0;i<4;i++){const yy=this.scale.height*.66+i*34;f.beginPath().moveTo(cx-46-i*13,yy).cubicBezierTo(cx-80-i*15,yy+18,cx-95-i*20,yy+35,cx-118-i*25,yy+50).strokePath();f.beginPath().moveTo(cx+46+i*13,yy).cubicBezierTo(cx+80+i*15,yy+18,cx+95+i*20,yy+35,cx+118+i*25,yy+50).strokePath();}
+    f.lineStyle(5,0xe7f6f2,.20);const cx=this.scale.width/2;for(let i=0;i<4;i++){const yy=this.scale.height*.66+i*34;f.beginPath().moveTo(cx-46-i*13,yy).lineTo(cx-80-i*15,yy+18).lineTo(cx-95-i*20,yy+35).lineTo(cx-118-i*25,yy+50).strokePath();f.beginPath().moveTo(cx+46+i*13,yy).lineTo(cx+80+i*15,yy+18).lineTo(cx+95+i*20,yy+35).lineTo(cx+118+i*25,yy+50).strokePath();}
   }
 
   private createDeckView(): void {

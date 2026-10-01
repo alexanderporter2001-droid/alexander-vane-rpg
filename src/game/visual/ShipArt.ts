@@ -29,8 +29,8 @@ function barrel(scene:Phaser.Scene,x:number,y:number,s=1):Phaser.GameObjects.Con
 }
 function rope(scene:Phaser.Scene,x:number,y:number):Phaser.GameObjects.Graphics{
   const g=scene.add.graphics();g.lineStyle(3,0xc9a06a,.9);
-  g.beginPath().moveTo(x-18,y+7).cubicBezierTo(x-30,y-12,x-8,y-24,x+8,y-14).cubicBezierTo(x+27,y-2,x+14,y+18,x-5,y+13).cubicBezierTo(x-19,y+9,x-12,y-7,x+2,y-7).strokePath();
-  g.beginPath().moveTo(x+8,y+12).cubicBezierTo(x+22,y+20,x+27,y+30,x+38,y+28).strokePath();return g;
+  g.beginPath().moveTo(x-18,y+7).lineTo(x-30,y-12).lineTo(x-8,y-24).lineTo(x+8,y-14).lineTo(x+27,y-2).lineTo(x+14,y+18).lineTo(x-5,y+13).lineTo(x-19,y+9).lineTo(x-12,y-7).lineTo(x+2,y-7).strokePath();
+  g.beginPath().moveTo(x+8,y+12).lineTo(x+22,y+20).lineTo(x+27,y+30).lineTo(x+38,y+28).strokePath();return g;
 }
 function lantern(scene:Phaser.Scene,x:number,y:number):Phaser.GameObjects.Container{
   const c=scene.add.container(x,y);const glow=scene.add.circle(0,2,38,0xffb847,.12).setBlendMode(Phaser.BlendModes.ADD);const g=scene.add.graphics();
