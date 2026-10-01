@@ -10,6 +10,7 @@ import { Toast } from '../systems/Toast';
 import { advanceWorldClock, advanceWorldMinutes } from '../systems/WorldClock';
 import { createEncounter, ensureKnownGroup } from '../systems/LivingWorld';
 import { crewCombatStats, fruitStats, playerCombatStats, recordCombatExperience, recordCrewExperience, recordFruitUse } from '../systems/Progression';
+import { createDeckArt, createInteriorArt, timeOfDayTint } from '../visual/ShipArt';
 
 interface BoarderUnit {
   id: string;
@@ -101,6 +102,9 @@ export class SeaScene extends Phaser.Scene {
   private deckCrewAttackReady = new Map<string, number>();
   private navigationExperienceDistance = 0;
   private nightShade?: Phaser.GameObjects.Rectangle;
+  private shipboardSea?: Phaser.GameObjects.TileSprite;
+  private shipboardFoam?: Phaser.GameObjects.Graphics;
+  private deckArt?: Phaser.GameObjects.Container;
   private shipArea: 'deck' | 'below' = 'deck';
   private interior?: Phaser.GameObjects.Container;
   private interiorPlayer?: Phaser.GameObjects.Image;
@@ -160,6 +164,7 @@ export class SeaScene extends Phaser.Scene {
       this.mobile.setCombatVisible(false);
     }
 
+    this.createShipboardSea();
     this.createDeckView();
     this.createShipInterior();
     this.applyNavigationPresentation(false);
@@ -250,6 +255,7 @@ export class SeaScene extends Phaser.Scene {
     this.applyShipVelocity(dt);
     this.updateCrewShipRoutine(dt);
     if (this.navigationMode !== 'sera') this.syncDeckToShip();
+    this.updateShipboardAtmosphere(dt);
     this.updateSeaEncounter(dt);
     this.updateNavigation();
     this.updateNightOverlay();
@@ -385,6 +391,7 @@ export class SeaScene extends Phaser.Scene {
       this.interiorPlayerLocal.x = Phaser.Math.Clamp(this.interiorPlayerLocal.x + move.x * 118 * dt, -158, 158);
       this.interiorPlayerLocal.y = Phaser.Math.Clamp(this.interiorPlayerLocal.y + move.y * 118 * dt, -198, 198);
       this.interiorPlayer.setPosition(this.interiorPlayerLocal.x, this.interiorPlayerLocal.y);
+      (this.interiorPlayer.getData('shadow') as Phaser.GameObjects.Ellipse | undefined)?.setPosition(this.interiorPlayerLocal.x,this.interiorPlayerLocal.y+23);
       return;
     }
     if (!this.deckPlayer) return;
@@ -393,6 +400,7 @@ export class SeaScene extends Phaser.Scene {
     const taper = this.deckPlayerLocal.y < -125 ? 125 : 170;
     this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x, -taper, taper);
     this.deckPlayer.setPosition(this.deckPlayerLocal.x, this.deckPlayerLocal.y);
+    (this.deckPlayer.getData('shadow') as Phaser.GameObjects.Ellipse | undefined)?.setPosition(this.deckPlayerLocal.x,this.deckPlayerLocal.y+25);
   }
 
   private updateCrewShipRoutine(dt: number): void {
@@ -426,6 +434,7 @@ export class SeaScene extends Phaser.Scene {
     view.x = Phaser.Math.Linear(view.x, this.rowanTarget.x, Phaser.Math.Clamp(step / 60, 0, 1));
     view.y = Phaser.Math.Linear(view.y, this.rowanTarget.y, Phaser.Math.Clamp(step / 60, 0, 1));
     view.sprite.setPosition(Math.round(view.x), Math.round(view.y));
+    (view.sprite.getData('shadow') as Phaser.GameObjects.Ellipse | undefined)?.setPosition(Math.round(view.x),Math.round(view.y+23));
     view.label.setPosition(Math.round(view.x), Math.round(view.y - (this.rowanArea === 'deck' ? 41 : 35)));
   }
 
@@ -497,15 +506,17 @@ export class SeaScene extends Phaser.Scene {
     const deckMode = delegated && !this.arrivalReady;
     this.ship.setVisible(!deckMode);
     this.deck?.setVisible(deckMode && this.shipArea === 'deck');
+    this.shipboardSea?.setVisible(deckMode && this.shipArea==='deck');
+    this.shipboardFoam?.setVisible(deckMode && this.shipArea==='deck');
     this.interior?.setVisible(deckMode && this.shipArea === 'below');
 
     if (delegated && this.arrivalReady) {
       this.ship.setVisible(false);
-      if (this.shipArea === 'deck') this.deck?.setVisible(true);
+      if (this.shipArea === 'deck') { this.deck?.setVisible(true); this.shipboardSea?.setVisible(true); this.shipboardFoam?.setVisible(true); }
       else this.interior?.setVisible(true);
       this.cameras.main.stopFollow();
       this.cameras.main.setScroll(0, 0);
-      this.cameras.main.setZoom(this.scale.width < 700 ? 1.55 : 1.42);
+      this.cameras.main.setZoom(this.scale.width < 700 ? 1.18 : 1.22);
       this.centerShipboardView();
       this.mobile?.setOrderLabel('TAKE HELM');
     } else if (delegated) {
@@ -563,36 +574,45 @@ export class SeaScene extends Phaser.Scene {
     return resolved;
   }
 
+  private createShipboardSea(): void {
+    const sea=this.add.tileSprite(0,0,this.scale.width,this.scale.height,'shipboard-water').setOrigin(0).setScrollFactor(0).setDepth(295).setVisible(false);
+    const foam=this.add.graphics().setScrollFactor(0).setDepth(296).setVisible(false);
+    this.shipboardSea=sea; this.shipboardFoam=foam;
+    const redraw=()=>{sea.setSize(this.scale.width,this.scale.height);};
+    this.scale.on('resize',redraw);
+  }
+
+  private updateShipboardAtmosphere(dt:number): void {
+    if(!this.shipboardSea||!this.shipboardFoam)return;
+    const onboard=this.navigationMode==='sera'&&(this.deck?.visible||this.interior?.visible);
+    this.shipboardSea.setVisible(onboard&&this.shipArea==='deck');
+    this.shipboardFoam.setVisible(onboard&&this.shipArea==='deck');
+    if(!onboard||this.shipArea!=='deck')return;
+    const motion=Math.max(0.15,Math.abs(this.speed)/12);
+    this.shipboardSea.tilePositionY-=22*dt*motion;
+    this.shipboardSea.tilePositionX+=7*dt*motion;
+    const f=this.shipboardFoam; f.clear(); f.lineStyle(3,0xdaf2ef,.28);
+    const t=this.time.now*.025;
+    for(let i=0;i<7;i++){const y=(t+i*83)%this.scale.height;f.beginPath();f.moveTo(0,y);f.lineTo(55,y-9);f.lineTo(118,y+1);f.strokePath();}
+  }
+
   private createDeckView(): void {
-    const deck = this.add.container(this.ship.x, this.ship.y).setDepth(310).setScrollFactor(0);
-
-    // Render the ship as one prerendered art texture instead of live geometry.
-    // The texture is deliberately oversized so the mobile camera reads it as
-    // a place Alexander is standing on, not a diagram under the characters.
-    const art = this.add.image(0, 0, 'wayward-deck-art').setDisplaySize(520, 650).setDepth(0);
-    const vignette = this.add.graphics().setDepth(1);
-    vignette.lineStyle(2, 0xf0c77a, 0.18).strokeEllipse(0, 10, 470, 590);
-
-    this.deckPlayer = this.add.image(this.deckPlayerLocal.x, this.deckPlayerLocal.y, 'alexander')
-      .setScale(0.52).setDepth(12);
-    deck.add([art, vignette, this.deckPlayer]);
+    const deck=this.add.container(this.ship.x,this.ship.y).setDepth(310).setScrollFactor(0);
+    const art=createDeckArt(this); this.deckArt=art; deck.add(art);
+    const shadow=this.add.ellipse(this.deckPlayerLocal.x,this.deckPlayerLocal.y+25,34,11,0x050607,.32).setDepth(9);
+    this.deckPlayer=this.add.image(this.deckPlayerLocal.x,this.deckPlayerLocal.y,'alexander').setScale(.47).setDepth(12);
+    this.deckPlayer.setData('shadow',shadow); deck.add([shadow,this.deckPlayer]);
     this.deckCrew.clear();
-
-    const save = SaveManager.get();
-    let slot = 0;
-    const crewSpots = [[-118,20],[-45,-45],[108,52],[-96,105],[72,112]] as const;
-    for (const member of save.crew) {
-      const atHelm = member.capabilities.includes('helm') && member.id === 'sera';
-      const p = atHelm ? [90,-150] as const : crewSpots[slot++ % crewSpots.length]!;
-      const x=p[0], y=p[1];
-      const sprite=this.add.image(x,y,this.crewTexture(member.id,member.visualArchetype,member.role))
-        .setScale(member.id==='rowan'?0.51:0.49).setDepth(11);
-      const label=this.add.text(x,y-48,atHelm?member.name.split(' ')[0]+' · HELM':member.name.split(' ')[0]??member.name,{
-        fontFamily:'Georgia, serif',fontSize:'9px',fontStyle:'bold',color:'#f7e5c8',
-        backgroundColor:'#0d0907bf',padding:{x:5,y:2},
-      }).setOrigin(0.5).setDepth(13);
-      if(member.hp<=0){sprite.setTint(0x555b5f).setAlpha(0.7).setAngle(90);label.setText(member.name.split(' ')[0]+' · DOWN').setColor('#ffd3ca');}
-      this.deckCrew.set(member.id,{sprite,label,x,y}); deck.add([sprite,label]);
+    const save=SaveManager.get();let slot=0;const crewSpots=[[-118,20],[-42,-42],[108,48],[-90,112],[72,112]] as const;
+    for(const member of save.crew){
+      const atHelm=member.capabilities.includes('helm')&&member.id==='sera';
+      const p=atHelm?[98,-154] as const:crewSpots[slot++%crewSpots.length]!;
+      const sprite=this.add.image(p[0],p[1],this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(member.id==='rowan'?.47:.44).setDepth(12);
+      const contact=this.add.ellipse(p[0],p[1]+24,32,10,0x050607,.3).setDepth(9);
+      const label=this.add.text(p[0],p[1]-42,atHelm?'Sera · helm':member.name.split(' ')[0]??member.name,{fontFamily:'Georgia, serif',fontSize:'8px',fontStyle:'bold',color:'#f4e4c5',backgroundColor:'#0b09079c',padding:{x:4,y:2}}).setOrigin(.5).setDepth(14);
+      sprite.setData('shadow',contact);
+      if(member.hp<=0){sprite.setTint(0x555b5f).setAlpha(.7).setAngle(90);label.setText((member.name.split(' ')[0]??member.name)+' · down');}
+      this.deckCrew.set(member.id,{sprite,label,x:p[0],y:p[1]});deck.add([contact,sprite,label]);
     }
     this.deck=deck;
   }
@@ -613,65 +633,28 @@ export class SeaScene extends Phaser.Scene {
   }
 
   private createShipInterior(): void {
-    const interior = this.add.container(this.ship.x, this.ship.y).setDepth(315).setVisible(false).setScrollFactor(0);
-    const g = this.add.graphics();
-    g.fillStyle(0x20160f, 0.98).fillRoundedRect(-180, -225, 360, 450, 34);
-    g.lineStyle(6, 0x8a6844, 1).strokeRoundedRect(-180, -225, 360, 450, 34);
-    g.fillStyle(0x5a3d27, 1).fillRect(-18, -205, 36, 380);
-    g.lineStyle(3, 0x9d7950, 0.9);
-    g.strokeRect(-160, -190, 132, 118);
-    g.strokeRect(28, -190, 132, 118);
-    g.strokeRect(-160, -54, 132, 110);
-    g.strokeRect(28, -54, 132, 110);
-    g.strokeRect(-160, 74, 132, 105);
-    g.strokeRect(28, 74, 132, 105);
-    g.fillStyle(0x3c291b, 1).fillRoundedRect(-55, 184, 110, 24, 8);
-
-    const labels = [
-      [-94, -176, 'CAPTAIN · ALEXANDER'],
-      [94, -176, 'SERA QUILL'],
-      [-94, -40, 'ROWAN VALE'],
-      [94, -40, 'GALLEY'],
-      [-94, 88, 'CREW BERTHS'],
-      [94, 88, 'CARGO HOLD'],
-      [0, 194, 'HATCH · MAIN DECK'],
+    const interior=this.add.container(this.ship.x,this.ship.y).setDepth(315).setVisible(false).setScrollFactor(0);
+    const art=createInteriorArt(this); interior.add(art);
+    const labels=[
+      [-100,-190,'CAPTAIN'],[100,-190,'SERA'],[-100,-52,'ROWAN'],
+      [100,-52,'GALLEY'],[-100,79,'BERTHS'],[100,79,'CARGO'],[0,197,'MAIN DECK']
     ] as const;
-    const texts = labels.map(([x, y, label]) => this.add.text(x, y, label, {
-      fontFamily: 'system-ui, sans-serif', fontSize: '9px', fontStyle: 'bold',
-      color: '#ead8b7', backgroundColor: '#120c08bb', padding: { x: 4, y: 2 },
-    }).setOrigin(0.5));
-
-    g.fillStyle(0x6b4b31, 1).fillRoundedRect(-145, -122, 70, 28, 6);
-    g.fillStyle(0x314052, 1).fillRoundedRect(-141, -119, 62, 20, 5);
-    g.fillStyle(0x705033, 1).fillRoundedRect(54, -122, 80, 24, 5);
-    g.fillStyle(0x5d432c, 1).fillRoundedRect(58, -4, 72, 34, 5);
-    g.fillStyle(0x4d3523, 1).fillRoundedRect(54, 118, 82, 42, 4);
-
-    this.interiorPlayer = this.add.image(this.interiorPlayerLocal.x, this.interiorPlayerLocal.y, 'alexander').setScale(0.44).setDepth(8);
-    interior.add([g, ...texts, this.interiorPlayer]);
-    this.interiorCrew.clear();
-
-    const save = SaveManager.get();
-    const minute = save.world.minuteOfDay;
-    const isNight = minute >= 21 * 60 || minute < 6 * 60;
-    const positions = new Map<string, { x: number; y: number }>();
-    positions.set('rowan', { x: -92, y: isNight ? -108 : 28 });
-    if (this.navigationMode !== 'sera') positions.set('sera', { x: 92, y: -105 });
-
-    let berth = 0;
-    for (const member of save.crew) {
-      if (member.id === 'sera' && this.navigationMode === 'sera') continue;
-      const p = positions.get(member.id) ?? { x: -120 + (berth % 3) * 54, y: 132 + Math.floor(berth / 3) * 32 };
-      if (!positions.has(member.id)) berth += 1;
-      const sprite = this.add.image(p.x, p.y, this.crewTexture(member.id, member.visualArchetype, member.role)).setScale(0.41).setDepth(7);
-      const label = this.add.text(p.x, p.y - 35, member.name.split(' ')[0] ?? member.name, {
-        fontFamily: 'system-ui, sans-serif', fontSize: '8px', fontStyle: 'bold',
-        color: '#f0dfc4', backgroundColor: '#120c08bb', padding: { x: 3, y: 1 },
-      }).setOrigin(0.5);
-      interior.add([sprite, label]);
-      this.interiorCrew.set(member.id, { sprite, label, x: p.x, y: p.y });
+    const texts=labels.map(([x,y,label])=>this.add.text(x,y,label,{fontFamily:'Georgia, serif',fontSize:'8px',fontStyle:'bold',color:'#e9d3ad',backgroundColor:'#100b087d',padding:{x:4,y:2}}).setOrigin(.5).setDepth(12));
+    const shadow=this.add.ellipse(this.interiorPlayerLocal.x,this.interiorPlayerLocal.y+23,32,10,0x050607,.3).setDepth(8);
+    this.interiorPlayer=this.add.image(this.interiorPlayerLocal.x,this.interiorPlayerLocal.y,'alexander').setScale(.42).setDepth(10);
+    this.interiorPlayer.setData('shadow',shadow);interior.add([...texts,shadow,this.interiorPlayer]);this.interiorCrew.clear();
+    const save=SaveManager.get(),minute=save.world.minuteOfDay,isNight=minute>=21*60||minute<6*60;
+    const positions=new Map<string,{x:number;y:number}>();positions.set('rowan',{x:-100,y:isNight?-124:-8});if(this.navigationMode!=='sera')positions.set('sera',{x:98,y:-132});
+    let berth=0;
+    for(const member of save.crew){
+      if(member.id==='sera'&&this.navigationMode==='sera')continue;
+      const p=positions.get(member.id)??{x:-128+(berth%3)*52,y:125+Math.floor(berth/3)*30};if(!positions.has(member.id))berth++;
+      const contact=this.add.ellipse(p.x,p.y+21,28,9,0x050607,.3).setDepth(8);
+      const sprite=this.add.image(p.x,p.y,this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(.38).setDepth(10);
+      const label=this.add.text(p.x,p.y-34,member.name.split(' ')[0]??member.name,{fontFamily:'Georgia, serif',fontSize:'7px',fontStyle:'bold',color:'#f0dfc4',backgroundColor:'#100b087d',padding:{x:3,y:1}}).setOrigin(.5).setDepth(12);
+      sprite.setData('shadow',contact);interior.add([contact,sprite,label]);this.interiorCrew.set(member.id,{sprite,label,x:p.x,y:p.y});
     }
-    this.interior = interior;
+    this.interior=interior;
   }
 
   private disableGull(): void {
@@ -972,7 +955,7 @@ export class SeaScene extends Phaser.Scene {
     this.ship.setVisible(false);
     this.deck.setVisible(true);
     this.cameras.main.startFollow(this.ship, true, 1, 1);
-    this.cameras.main.setZoom(this.scale.width < 700 ? 1.58 : 1.44);
+    this.cameras.main.setZoom(this.scale.width < 700 ? 1.18 : 1.22);
     this.mobile?.setCombatVisible(true);
     this.mobile?.setInteract(null);
     this.crewHud.setVisible(true);
@@ -1032,8 +1015,8 @@ export class SeaScene extends Phaser.Scene {
       if (target.distance > 38) {
         const v = new Phaser.Math.Vector2(target.x - boarder.sprite.x, target.y - boarder.sprite.y).normalize();
         const speed = 72 + (this.activeEncounter?.strength ?? 0.4) * 36;
-        boarder.sprite.x = Phaser.Math.Clamp(boarder.sprite.x + v.x * speed * dt, -82, 82);
-        boarder.sprite.y = Phaser.Math.Clamp(boarder.sprite.y + v.y * speed * dt, -138, 138);
+        boarder.sprite.x = Phaser.Math.Clamp(boarder.sprite.x + v.x * speed * dt, -155, 165);
+        boarder.sprite.y = Phaser.Math.Clamp(boarder.sprite.y + v.y * speed * dt, -185, 175);
       } else if (this.time.now >= boarder.attackReadyAt) {
         boarder.attackReadyAt = this.time.now + 1150;
         const damage = 5 + Math.round((this.activeEncounter?.strength ?? 0.4) * 4);
@@ -1064,7 +1047,7 @@ export class SeaScene extends Phaser.Scene {
             if (state.hp <= 0) {
               view.sprite.setTint(0x555b5f).setAlpha(0.7).setAngle(90);
               view.label.setText((state.name.split(' ')[0] ?? state.name) + ' · DOWN').setColor('#ffd3ca');
-            } else if (Math.abs(view.sprite.x) > 86 || Math.abs(view.sprite.y) > 146) {
+            } else if (Math.abs(view.sprite.x) > 175 || view.sprite.y < -205 || view.sprite.y > 205) {
               state.hp = 0;
               save.world.flags['overboard-' + state.id] = true;
               view.sprite.setVisible(false);
@@ -1150,8 +1133,8 @@ export class SeaScene extends Phaser.Scene {
       if (distance > stats.range * 0.42) continue;
       const toward = new Phaser.Math.Vector2(this.deckPlayerLocal.x - boarder.sprite.x, this.deckPlayerLocal.y - boarder.sprite.y).normalize();
       const displacement = Math.min(54, stats.force * 0.08);
-      boarder.sprite.x = Phaser.Math.Clamp(boarder.sprite.x + toward.x * displacement, -84, 84);
-      boarder.sprite.y = Phaser.Math.Clamp(boarder.sprite.y + toward.y * displacement, -142, 142);
+      boarder.sprite.x = Phaser.Math.Clamp(boarder.sprite.x + toward.x * displacement, -158, 168);
+      boarder.sprite.y = Phaser.Math.Clamp(boarder.sprite.y + toward.y * displacement, -188, 178);
       affected += 1;
     }
     recordFruitUse(save, affected);
@@ -1166,8 +1149,8 @@ export class SeaScene extends Phaser.Scene {
     if (move.lengthSq() < 0.04) return;
     save.player.stamina -= combat.dashCost;
     move.normalize().scale(48);
-    this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x + move.x, -68, 68);
-    this.deckPlayerLocal.y = Phaser.Math.Clamp(this.deckPlayerLocal.y + move.y, -92, 108);
+    this.deckPlayerLocal.x = Phaser.Math.Clamp(this.deckPlayerLocal.x + move.x, -160, 165);
+    this.deckPlayerLocal.y = Phaser.Math.Clamp(this.deckPlayerLocal.y + move.y, -185, 180);
   }
 
   private endBoardingCombat(): void {
@@ -1348,19 +1331,19 @@ export class SeaScene extends Phaser.Scene {
   private createHud(): void {
     this.hud = this.add.text(14, 14, '', {
       fontFamily: 'Georgia, serif',
-      fontSize: '13px',
+      fontSize: '11px',
       color: '#eef4f6',
       backgroundColor: '#071116dd',
-      padding: { x: 10, y: 8 },
-      lineSpacing: 3,
+      padding: { x: 7, y: 5 },
+      lineSpacing: 2,
     }).setScrollFactor(0).setDepth(2500);
 
     this.nav = this.add.text(this.scale.width - 14, 14, '', {
       fontFamily: 'Georgia, serif',
-      fontSize: '12px',
+      fontSize: '10px',
       color: '#d5e1e5',
       backgroundColor: '#071116cc',
-      padding: { x: 10, y: 8 },
+      padding: { x: 7, y: 5 },
       align: 'right',
     }).setOrigin(1, 0).setScrollFactor(0).setDepth(2500);
 
@@ -1434,7 +1417,7 @@ export class SeaScene extends Phaser.Scene {
     this.navigationMode = 'sera';
     this.arrivalReady = false;
     this.arrivalNotifiedPortId = null;
-    if (this.speed < 35) this.speed = 52;
+    if (this.speed < 8) this.speed = 8;
     this.applyNavigationPresentation(false);
     SaveManager.save();
     this.toast.show('Sera sets a course for ' + port.name + ' · ' + this.formatEta(this.estimateTravelMinutes(port)) + ' estimated.', 3600);
@@ -1491,6 +1474,7 @@ export class SeaScene extends Phaser.Scene {
   private enterShipInterior(): void {
     this.shipArea = 'below';
     this.deck?.setVisible(false);
+    this.shipboardSea?.setVisible(false); this.shipboardFoam?.setVisible(false);
     this.interior?.setVisible(true);
     this.interiorPlayerLocal.set(0, 172);
     this.interiorPlayer?.setPosition(0, 172);
@@ -1500,9 +1484,10 @@ export class SeaScene extends Phaser.Scene {
   private leaveShipInterior(): void {
     this.shipArea = 'deck';
     this.interior?.setVisible(false);
-    this.deck?.setVisible(true);
+    this.deck?.setVisible(true); this.shipboardSea?.setVisible(true); this.shipboardFoam?.setVisible(true);
     this.deckPlayerLocal.set(0, 160);
-    this.deckPlayer?.setPosition(0, 88);
+    this.deckPlayer?.setPosition(0, 160);
+    (this.deckPlayer?.getData('shadow') as Phaser.GameObjects.Ellipse | undefined)?.setPosition(0,185);
     this.toast.show('You climb back onto the main deck.', 1800);
   }
 
@@ -1596,12 +1581,11 @@ export class SeaScene extends Phaser.Scene {
 
   private updateNightOverlay(): void {
     if (!this.nightShade) return;
-    const minute = SaveManager.get().world.minuteOfDay;
-    let alpha = 0;
-    if (minute >= 20 * 60 || minute < 5 * 60) alpha = 0.48;
-    else if (minute >= 18 * 60) alpha = ((minute - 18 * 60) / 120) * 0.48;
-    else if (minute < 7 * 60) alpha = ((7 * 60 - minute) / 120) * 0.48;
-    this.nightShade.setAlpha(Phaser.Math.Clamp(alpha, 0, 0.48));
+    const minute=SaveManager.get().world.minuteOfDay;
+    const mood=timeOfDayTint(minute);
+    this.nightShade.setFillStyle(mood.shade,1).setAlpha(mood.alpha);
+    const lamps=this.deckArt?.getData('lamps') as Phaser.GameObjects.Container | undefined;
+    lamps?.setAlpha(mood.lampAlpha);
   }
 
   private cardinal(angle: number): string {

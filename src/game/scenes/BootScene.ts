@@ -22,6 +22,7 @@ export class BootScene extends Phaser.Scene {
     this.makeCharacter('npc-dockhand', 0x9f6e4f, 0x40515a, 0x7c8c93, 'dockhand');
     this.makeCharacter('npc-sailor', 0xc28b67, 0x5b4635, 0x3c6d83, 'sailor');
     this.makeShip();
+    this.makeWaterTexture();
     this.makeDeckArt();
     this.makeProp('crate', 0x74512f, 44, 44);
     this.makeProp('barrel', 0x805b31, 38, 44);
@@ -154,6 +155,20 @@ export class BootScene extends Phaser.Scene {
     g.fillStyle(0x172735, 1).fillCircle(58, 120, 11);
     g.generateTexture('wayward-gull', 116, 168);
     g.destroy();
+  }
+
+  private makeWaterTexture(): void {
+    const g=this.add.graphics();
+    g.fillStyle(0x0c4257,1).fillRect(0,0,256,256);
+    g.fillStyle(0x12586d,.55).fillEllipse(45,42,120,34).fillEllipse(205,164,145,38);
+    g.fillStyle(0x0a3448,.55).fillEllipse(160,94,160,44).fillEllipse(65,220,130,36);
+    g.lineStyle(3,0x7fc5cf,.23);
+    for(const [x,y,w] of [[8,28,62],[102,62,88],[24,120,100],[145,145,72],[65,194,75],[166,229,80]] as const){
+      g.beginPath().moveTo(x,y).lineTo(x+w*.45,y-4).lineTo(x+w,y+2).strokePath();
+    }
+    g.lineStyle(1,0xd4eef0,.16);
+    for(const [x,y,w] of [[20,72,44],[170,30,55],[118,184,48],[12,242,60]] as const)g.lineBetween(x,y,x+w,y-3);
+    g.generateTexture('shipboard-water',256,256);g.destroy();
   }
 
   private makeProp(key: string, color: number, width: number, height: number): void {
