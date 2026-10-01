@@ -13,7 +13,8 @@ export class BootScene extends Phaser.Scene {
     this.load.image('prod-ocean-swell', 'assets/production/ocean/swell.webp');
     this.load.image('prod-ocean-foam', 'assets/production/ocean/foam.webp');
     this.load.image('prod-ocean-wake', 'assets/production/ocean/wake.webp');
-    this.load.image('kenney-pirate-tiles', 'assets/licensed/kenney-pirate/tiles_sheet.png');
+    this.load.image('prod-helm-hires', 'assets/production/ship/props/helm-hires.webp');
+    this.load.spritesheet('kenney-pirate-tiles', 'assets/licensed/kenney-pirate/tiles_sheet.png', { frameWidth: 64, frameHeight: 64 });
     this.load.image('kenney-pirate-ships', 'assets/licensed/kenney-pirate/shipsMiscellaneous_sheet.png');
     this.load.spritesheet('scallywag-blue', 'assets/licensed/scallywag-pirates/pirates-blue.png', { frameWidth: 16, frameHeight: 16 });
     this.load.spritesheet('scallywag-red', 'assets/licensed/scallywag-pirates/pirates-red.png', { frameWidth: 16, frameHeight: 16 });
@@ -74,6 +75,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   private makeCharacter(key: string, skin: number, cloth: number, accent: number, role: string): void {
+    if (this.textures.exists(key)) return;
     const g = this.add.graphics();
     g.fillStyle(0x0a0b0d, 0.25).fillEllipse(36, 98, 45, 10);
     const bodyX = role === 'fighter' ? 10 : role === 'navigator' ? 18 : 15;
