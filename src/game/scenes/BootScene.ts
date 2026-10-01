@@ -21,6 +21,7 @@ export class BootScene extends Phaser.Scene {
     createHeroTextures(this,'alexander','captain');
     createHeroTextures(this,'sera','navigator');
     createHeroTextures(this,'rowan','fighter');
+    this.makeLicensedCharacterTextures();
     this.makeCharacter('crew-medic', 0xb98263, 0x49616d, 0xd7e1d0, 'medic');
     this.makeCharacter('crew-specialist', 0xa7775c, 0x4b5660, 0xb58b56, 'specialist');
     this.makeCharacter('marine', 0xd9b38c, 0xe6eef1, 0x315f8d, 'marine');
@@ -40,6 +41,28 @@ export class BootScene extends Phaser.Scene {
     bullet.fillStyle(0xffe3a2, 1).fillCircle(5, 5, 4);
     bullet.generateTexture('bullet', 10, 10);
     bullet.destroy();
+  }
+
+  private makeLicensedCharacterTextures(): void {
+    // CC0 Scallywag sheets are the production fallback for generic population.
+    // Copy valid source frames into stable semantic texture keys so scenes never
+    // expose Phaser's missing-texture/debug square.
+    const roles: Array<[string, string, number]> = [
+      ['crew-medic', 'scallywag-blue', 22], ['crew-specialist', 'scallywag-blue', 41],
+      ['marine', 'scallywag-blue', 3], ['npc-harbor', 'scallywag-blue', 60],
+      ['npc-sailor', 'scallywag-blue', 79], ['npc-dockhand', 'scallywag-blue', 98],
+      ['npc-tavern', 'scallywag-red', 22], ['npc-provisioner', 'scallywag-red', 41],
+      ['npc-shipwright', 'scallywag-red', 60],
+    ];
+    for (const [key, sheet, frame] of roles) {
+      if (!this.textures.exists(sheet)) continue;
+      const src = this.textures.getFrame(sheet, frame);
+      if (!src) continue;
+      const rt = this.add.renderTexture(0, 0, 32, 48).setVisible(false);
+      rt.drawFrame(sheet, frame, 8, 16);
+      rt.saveTexture(key);
+      rt.destroy();
+    }
   }
 
   private makeCharacter(key: string, skin: number, cloth: number, accent: number, role: string): void {
