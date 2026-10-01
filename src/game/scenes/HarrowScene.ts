@@ -907,7 +907,7 @@ export class HarrowScene extends Phaser.Scene {
   private drawHarbor(): void {
     addProductionGround(this,this.worldW,this.worldH,0x48415252,'harbor',-21);
     addProductionClutter(this,0x48415252,[[180,620],[320,760],[570,580],[805,610],[930,470],[1060,335],[1210,320],[1330,600]],-7);
-    this.add.rectangle(this.worldW / 2, this.worldH / 2, this.worldW, this.worldH, 0x173b49).setDepth(-20);
+    this.add.rectangle(this.worldW / 2, this.worldH / 2, this.worldW, this.worldH, 0x173b49,0.38).setDepth(-20);
 
     const water = this.add.graphics().setDepth(-19);
     water.lineStyle(2, 0x78a8b7, 0.13);
@@ -921,7 +921,7 @@ export class HarrowScene extends Phaser.Scene {
       }
     }
 
-    const ground = this.add.graphics().setDepth(-10);
+    const ground = this.add.graphics().setDepth(-10).setAlpha(.82);
     ground.fillStyle(0x6f6250, 1).fillRect(110, 535, 1315, 489);
     ground.fillStyle(0x7f6545, 1).fillRect(610, 300, 290, 350);
     ground.fillRect(845, 330, 185, 240);
