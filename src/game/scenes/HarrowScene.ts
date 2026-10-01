@@ -838,8 +838,8 @@ export class HarrowScene extends Phaser.Scene {
   }
 
   private crewTexture(id: string, visualArchetype: string | undefined, role: string): string {
-    if (id === 'sera') return heroTexture('sera','down',0);
-    if (id === 'rowan') return heroTexture('rowan','down',0);
+    if (id === 'sera') return this.textures.exists('prod-sera') ? 'prod-sera' : heroTexture('sera','down',0);
+    if (id === 'rowan') return this.textures.exists('prod-rowan') ? 'prod-rowan' : heroTexture('rowan','down',0);
     if (visualArchetype === 'crew-medic') return 'crew-medic';
     if (visualArchetype === 'crew-fighter' || role.toLowerCase().includes('fighter')) return heroTexture('rowan','down',0);
     return 'crew-specialist';
