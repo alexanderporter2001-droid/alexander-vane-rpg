@@ -604,7 +604,7 @@ export class SeaScene extends Phaser.Scene {
     this.deckPlayer.setData('shadow',shadow); deck.add([shadow,this.deckPlayer]);
     this.deckCrew.clear();
     const save=SaveManager.get();let slot=0;const crewSpots=[[-118,20],[-42,-42],[108,48],[-90,112],[72,112]] as const;
-    for(const member of save.crew){
+    for (const member of save.crew) {
       const atHelm=member.capabilities.includes('helm')&&member.id==='sera';
       const p=atHelm?[98,-154] as const:crewSpots[slot++%crewSpots.length]!;
       const sprite=this.add.image(p[0],p[1],this.crewTexture(member.id,member.visualArchetype,member.role)).setScale(member.id==='rowan'?.47:.44).setDepth(12);
